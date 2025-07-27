@@ -1,19 +1,29 @@
+"use client";
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAdminChat } from "@/contexts/AdminChatContext";
 
 import {
-  FaSquarespace,
   FaRegPlusSquare,
   FaListAlt,
   FaBookmark,
   FaShoppingCart,
+  FaEnvelope,
+  FaComment,
+  FaTachometerAlt,
+  FaCog,
+  FaEdit,
+  FaStar,
+  FaImages
 } from "react-icons/fa";
+import { BiSolidBookContent } from "react-icons/bi";
 
 const SideBar = () => {
   const pathname = usePathname();
+  const { totalUnreadCount } = useAdminChat();
   const menuItems = [
-    { name: "Dashboard", path: "/admin", icon: <FaSquarespace /> },
+    { name: "Dashboard", path: "/admin", icon: <FaTachometerAlt /> },
     {
       name: "Add Product",
       path: "/admin/add-product",
@@ -26,6 +36,13 @@ const SideBar = () => {
     },
     { name: "Category", path: "/admin/category", icon: <FaBookmark /> },
     { name: "Orders", path: "/admin/orders", icon: <FaShoppingCart /> },
+    { name: "Chat", path: "/admin/chat", icon: <FaEnvelope /> },
+    { name: "Reviews", path: "/admin/reviews", icon: <FaComment /> },
+    { name: "Contents", path: "/admin/content", icon: <BiSolidBookContent /> },
+    { name: "Footer Setting", path: "/admin/footer-setting", icon: <FaEdit /> },
+    { name: "Featured Products", path: "/admin/featured-product", icon: <FaStar /> },
+    { name: "Homepage Manager", path: "/admin/homepage-manager", icon: <FaImages /> },
+    { name: "Settings", path: "/admin/settings", icon: <FaCog /> },
   ];
 
   return (
@@ -46,6 +63,11 @@ const SideBar = () => {
                 {item.icon}
               </div>
               <p className="md:block hidden text-center">{item.name}</p>
+              {item.name === "Chat" && totalUnreadCount > 0 && (
+                <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                  {totalUnreadCount}
+                </span>
+              )}
             </div>
           </Link>
         );

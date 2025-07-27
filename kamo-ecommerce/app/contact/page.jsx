@@ -1,56 +1,53 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import api from "@/service/api";
+import Loading from "@/components/Loading";
 
 const ContactPage = () => {
+  const [content, setContent] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      try {
+        const res = await api.get("/content/contact_us");
+        setContent(res.data);
+      } catch (error) {
+        console.error("Failed to fetch content:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchContent();
+  }, []);
+
   return (
     <>
       <Navbar />
       <div className="px-6 md:px-16 lg:px-32 pt-14 md:pb-12">
         <div className="flex flex-col items-start">
           <div className="flex flex-col items-end pt-8 md:pt-12">
-            <p className="text-2xl md:text-3xl font-medium">Kontak Kami</p>
+            <p className="text-2xl md:text-3xl font-medium">
+              {loading ? "Memuat..." : content?.content_title || "Kontak Kami"}
+            </p>
             <div className="w-16 h-0.5 bg-accent rounded-full mt-1"></div>
           </div>
 
           {/* Konten dan Maps */}
           <div className="mt-8 md:mt-12 flex flex-col lg:flex-row gap-8 w-full">
             {/* Konten teks */}
-            <div className="text-gray-700 space-y-6 w-full lg:w-1/2">
-              <p className="text-lg">
-                We'd love to hear from you! Whether you have a question about
-                our products, an order, or just want to say hello, feel free to
-                reach out to us through any of the methods below.
-              </p>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800 mb-2">Office Hours</h2>
-                <p>
-                  Monday - Friday: 9 AM - 5 PM
-                  <br />
-                  Saturday: 9 AM - 2 PM
-                </p>
-              </div>
-
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800 mb-2">
-                  Get in Touch
-                </h2>
-                <p>
-                  <strong>Email:</strong> support@kamoecommerce.com
-                </p>
-                <p>
-                  <strong>Phone:</strong> +1 (234) 567-8900 (Mon-Fri, 9 AM - 5
-                  PM)
-                </p>
-                <p>
-                  <strong>Address:</strong> 123 Tech Avenue, Silicon Valley, CA
-                  94000, USA
-                </p>
-              </div>
-            </div>
+            {loading ? (
+              <div className="w-full lg:w-1/2"><Loading /></div>
+            ) : (
+              <div
+                className="text-gray-700 space-y-6 w-full lg:w-1/2 prose max-w-none"
+                dangerouslySetInnerHTML={{ __html: content?.content_value || "<p>Konten tidak tersedia.</p>" }}
+              />
+            )}
 
             {/* Google Maps */}
             <div className="w-full lg:w-1/2">

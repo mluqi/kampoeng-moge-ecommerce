@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { assets } from "@/assets/assets";
 import ProductCard from "@/components/ProductCard";
 import Navbar from "@/components/Navbar";
@@ -8,32 +8,45 @@ import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import Loading from "@/components/Loading";
 import { useProduct } from "@/contexts/ProductContext";
+import { useUserAuth } from "@/contexts/UserAuthContext";
+import { useCart } from "@/contexts/CartContext";
+import { FaHeart, FaShoppingCart, FaArrowRight } from "react-icons/fa";
+import StarRating from "@/components/StarRating";
 import api from "@/service/api";
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { toast } from "react-hot-toast";
 
 const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 const Product = () => {
   const { id } = useParams();
   const router = useRouter();
-  // const { addToCart } = useAppContext();
   const { fetchProductById } = useProduct();
+  const { addToCart } = useCart();
+  const { user, wishlist, addToWishlist, removeFromWishlist } = useUserAuth();
 
   const [mainImage, setMainImage] = useState(null);
   const [productData, setProductData] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [loadingRelated, setLoadingRelated] = useState(true);
+  const [reviews, setReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(true);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  // 1. Ambil data produk utama berdasarkan ID dari URL
+  // Fetch main product data
   useEffect(() => {
     let isMounted = true;
-    // Pastikan data lama dibersihkan saat ID berubah
     setProductData(null);
 
     const getProduct = async () => {
-      const product = await fetchProductById(id);
-      if (isMounted && product) {
-        setProductData(product);
-        setMainImage(product.product_pictures?.[0] || null);
+      try {
+        const product = await fetchProductById(id);
+        if (isMounted && product) {
+          setProductData(product);
+          setMainImage(product.product_pictures?.[0] || null);
+        }
+      } catch (error) {
+        toast.error("Gagal memuat produk");
       }
     };
 
@@ -43,178 +56,407 @@ const Product = () => {
     };
   }, [id]);
 
-  // 2. Ambil produk terkait setelah data produk utama tersedia
+  // Fetch related products
   useEffect(() => {
     if (productData?.product_category) {
       const fetchRelated = async () => {
         setLoadingRelated(true);
-        const res = await api.get(`/products?category=${productData.product_category}&limit=6`);
-        // Filter produk saat ini dari hasil dan batasi hingga 5
-        const filtered = res.data.data.filter(p => p.product_id !== id).slice(0, 5);
-        setRelatedProducts(filtered);
+        try {
+          const res = await api.get(
+            `/products?category=${productData.product_category}&limit=6`
+          );
+          const filtered = res.data.data
+            .filter((p) => p.product_id !== id)
+            .slice(0, 5);
+          setRelatedProducts(filtered);
+        } catch (error) {
+          toast.error("Gagal memuat produk terkait");
+        }
         setLoadingRelated(false);
       };
       fetchRelated();
     }
   }, [productData, id]);
 
-  return productData ? (
+  // Fetch reviews
+  useEffect(() => {
+    if (id) {
+      const fetchReviews = async () => {
+        setLoadingReviews(true);
+        try {
+          const res = await api.get(`/reviews/product/${id}`);
+          setReviews(res.data);
+        } catch (error) {
+          toast.error("Gagal memuat ulasan");
+        }
+        setLoadingReviews(false);
+      };
+      fetchReviews();
+    }
+  }, [id]);
+
+  const isOutOfStock = productData && productData.product_stock <= 0;
+  const isWishlisted = useMemo(
+    () =>
+      productData &&
+      wishlist.some((item) => item.product_id === productData.product_id),
+    [wishlist, productData]
+  );
+
+  const handleWishlistClick = () => {
+    if (!user) {
+      router.push("/account");
+      return;
+    }
+    if (isWishlisted) {
+      removeFromWishlist(productData.product_id);
+      // toast.success("Produk dihapus dari wishlist");
+    } else {
+      addToWishlist(productData.product_id);
+      // toast.success("Produk ditambahkan ke wishlist");
+    }
+  };
+
+  const handleAddToCart = () => {
+    if (!user) {
+      toast.error("Silakan login terlebih dahulu", {
+        icon: "🔒",
+        position: "top-center",
+        style: {
+          background: "#ff4444",
+          color: "#fff",
+        },
+      });
+      return;
+    }
+    addToCart(productData.product_id);
+    toast.success("Produk ditambahkan ke keranjang");
+  };
+
+  const handleBuyNow = () => {
+    if (!user) {
+      toast.error("Silakan login terlebih dahulu", {
+        icon: "🔒",
+        position: "top-center",
+        style: {
+          background: "#ff4444",
+          color: "#fff",
+        },
+      });
+      return;
+    }
+    // if (isOutOfStock) {
+    //   toast.error("Produk ini sedang habis stok");
+    //   return;
+    // }
+    addToCart(productData.product_id);
+    router.push("/cart");
+  };
+
+  const navigateImage = (direction) => {
+    if (!productData?.product_pictures) return;
+
+    const totalImages = productData.product_pictures.length;
+    let newIndex;
+
+    if (direction === "next") {
+      newIndex = (currentImageIndex + 1) % totalImages;
+    } else {
+      newIndex = (currentImageIndex - 1 + totalImages) % totalImages;
+    }
+
+    setCurrentImageIndex(newIndex);
+    setMainImage(productData.product_pictures[newIndex]);
+  };
+
+  if (!productData) {
+    return <Loading />;
+  }
+
+  return (
     <>
       <Navbar />
-      <div className="px-6 md:px-16 lg:px-32 pt-14 space-y-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
-          <div className="px-5 lg:px-16 xl:px-20">
-            <div className="rounded-lg overflow-hidden bg-gray-500/10 mb-4">
+      <div className="px-4 md:px-8 lg:px-16 pt-8 pb-16 max-w-7xl mx-auto">
+        {/* Breadcrumb */}
+        <div className="flex items-center text-sm text-gray-500 mb-6">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center hover:text-accent"
+          >
+            <FiChevronLeft className="mr-1" /> Kembali
+          </button>
+          <span className="mx-2">/</span>
+          <span className="text-gray-700">{productData.product_name}</span>
+        </div>
+
+        {/* Product Main Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+          {/* Product Images */}
+          <div className="relative">
+            <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden mb-4">
               <Image
                 src={
                   mainImage ? baseUrl + mainImage : assets.product_placeholder
                 }
-                alt={productData.product_name || "Product Image"}
-                className="w-full h-auto object-cover mix-blend-multiply"
-                width={1280}
-                height={720}
+                alt={productData.product_name}
+                className="object-contain w-full h-full"
+                width={800}
+                height={800}
                 priority
               />
+
+              {productData.product_pictures?.length > 1 && (
+                <>
+                  <button
+                    onClick={() => navigateImage("prev")}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 p-2 rounded-full shadow-md hover:bg-white"
+                  >
+                    <FiChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => navigateImage("next")}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 p-2 rounded-full shadow-md hover:bg-white"
+                  >
+                    <FiChevronRight className="w-5 h-5" />
+                  </button>
+                </>
+              )}
             </div>
-            <div className="grid grid-cols-4 gap-4">
+
+            <div className="grid grid-cols-4 gap-3">
               {productData.product_pictures?.map((image, index) => (
-                <div
+                <button
                   key={index}
-                  onClick={() => setMainImage(image)}
-                  className={`cursor-pointer rounded-lg overflow-hidden bg-gray-500/10 border-2 ${
-                    mainImage === image ? "border-accent" : "border-transparent"
+                  onClick={() => {
+                    setMainImage(image);
+                    setCurrentImageIndex(index);
+                  }}
+                  className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                    mainImage === image
+                      ? "border-accent ring-2 ring-accent/30"
+                      : "border-transparent hover:border-gray-200"
                   }`}
                 >
                   <Image
                     src={baseUrl + image}
-                    alt={`${productData.product_name || "Product"} thumbnail ${
-                      index + 1
-                    }`}
-                    className="w-full h-auto object-cover mix-blend-multiply"
-                    width={1280}
-                    height={720}
+                    alt={`Thumbnail ${index + 1}`}
+                    className="object-cover w-full h-full"
+                    width={200}
+                    height={200}
                   />
-                </div>
+                </button>
               ))}
             </div>
           </div>
+
+          {/* Product Info */}
           <div className="flex flex-col">
-            <h1 className="text-3xl font-medium text-gray-800/90 mb-4">
-              {productData.product_name}
-            </h1>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-0.5">
-                <Image
-                  className="h-4 w-4"
-                  src={assets.star_icon}
-                  alt="star_icon"
-                />
-                <Image
-                  className="h-4 w-4"
-                  src={assets.star_icon}
-                  alt="star_icon"
-                />
-                <Image
-                  className="h-4 w-4"
-                  src={assets.star_icon}
-                  alt="star_icon"
-                />
-                <Image
-                  className="h-4 w-4"
-                  src={assets.star_icon}
-                  alt="star_icon"
-                />
-                <Image
-                  className="h-4 w-4"
-                  src={assets.star_dull_icon}
-                  alt="star_dull_icon"
-                />
-              </div>
-              <p>(4.5)</p>
-            </div>
-            <p className="text-gray-600 mt-3">
-              {productData.product_description}
-            </p>
-            <p className="text-3xl font-medium mt-6">
-              Rp {(productData.product_price || 0).toLocaleString("id-ID")}
-            </p>
-            <hr className="bg-gray-600 my-6" />
-            <div className="overflow-x-auto">
-              <table className="table-auto border-collapse w-full max-w-72">
-                <tbody>
-                  <tr>
-                    <td className="text-gray-600 font-medium">Brand</td>
-                    <td className="text-gray-800/50 ">Generic</td>
-                  </tr>
-                  <tr>
-                    <td className="text-gray-600 font-medium">Color</td>
-                    <td className="text-gray-800/50 ">Multi</td>
-                  </tr>
-                  <tr>
-                    <td className="text-gray-600 font-medium">Category</td>
-                    <td className="text-gray-800/50">
-                      {typeof productData.category === "object"
-                        ? productData.category.category_name
-                        : productData.category}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div className="flex items-center mt-10 gap-4">
+            <div className="flex justify-between items-start">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+                {productData.product_name}
+              </h1>
               <button
-                // onClick={() => addToCart(productData.product_id)}
-                className="w-full py-3.5 bg-gray-100 text-gray-800/80 hover:bg-gray-200 transition"
+                onClick={handleWishlistClick}
+                className="p-2 text-lg"
+                aria-label={
+                  isWishlisted ? "Hapus dari wishlist" : "Tambahkan ke wishlist"
+                }
               >
+                <FaHeart
+                  className={`transition-colors ${
+                    isWishlisted
+                      ? "text-red-500"
+                      : "text-gray-300 hover:text-red-400"
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 mb-4">
+              <StarRating
+                rating={productData.product_average_rating || 0}
+                size={20}
+              />
+              <span className="text-sm text-gray-500">
+                {productData.product_review_count > 0
+                  ? `(${productData.product_review_count} ulasan)`
+                  : "(Belum ada ulasan)"}
+              </span>
+            </div>
+
+            <div className="my-6 p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-end gap-2">
+                <span className="text-3xl font-bold text-gray-900">
+                  Rp {productData.product_price?.toLocaleString("id-ID")}
+                </span>
+                {isOutOfStock && (
+                  <span className="ml-auto px-3 py-1 bg-red-100 text-red-700 text-sm font-medium rounded-full">
+                    Stok Habis
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-2">Deskripsi Produk</h3>
+              <div
+                className="prose max-w-none text-gray-600"
+                dangerouslySetInnerHTML={{
+                  __html: productData.product_description || "",
+                }}
+              ></div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-500">Brand</p>
+                <p className="font-medium">
+                  {productData.product_brand || "-"}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-500">Kondisi</p>
+                <p className="font-medium">{productData.product_condition}</p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-500">Kategori</p>
+                <p className="font-medium">
+                  {typeof productData.category === "object"
+                    ? productData.category.category_name
+                    : productData.category}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-500">Stok Tersedia</p>
+                <p className="font-medium">{productData.product_stock}</p>
+              </div>
+            </div>
+
+            <div className="mt-auto space-y-3">
+              <button
+                onClick={handleAddToCart}
+                disabled={isOutOfStock}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-accent hover:bg-accent/90 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FaShoppingCart />
                 Tambah ke Keranjang
               </button>
               <button
-                onClick={() => {
-                  // addToCart(productData.product_id);
-                  router.push("/cart");
-                }}
-                className="w-full py-3.5 bg-accent/90 text-white hover:bg-accent transition"
+                onClick={handleBuyNow}
+                disabled={isOutOfStock}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Beli Sekarang
+                <FaArrowRight />
               </button>
             </div>
           </div>
         </div>
-        <div className="flex flex-col items-center">
-          <div className="flex flex-col items-center mb-4 mt-16">
-            <p className="text-3xl font-medium">
-              Produk{" "}
-              <span className="font-medium text-accent/90">Unggulan</span>
-            </p>
-            <div className="w-28 h-0.5 bg-accent/90 mt-2"></div>
+
+        {/* Reviews Section */}
+        <section className="mt-16 pt-8 border-t">
+          <h2 className="text-2xl font-bold mb-6">Ulasan Produk</h2>
+
+          {loadingReviews ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-accent"></div>
+            </div>
+          ) : reviews.length > 0 ? (
+            <div className="space-y-6">
+              {reviews.map((review) => (
+                <div
+                  key={review.id}
+                  className="flex gap-4 pb-6 border-b last:border-0"
+                >
+                  <div className="flex-shrink-0">
+                    <Image
+                      src={review.user.user_photo || assets.icon}
+                      alt={review.user.user_name}
+                      width={48}
+                      height={48}
+                      className="rounded-full object-cover w-12 h-12"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                      <h3 className="font-semibold">{review.user.user_name}</h3>
+                      <span className="text-sm text-gray-500">
+                        {new Date(review.createdAt).toLocaleDateString(
+                          "id-ID",
+                          {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          }
+                        )}
+                      </span>
+                    </div>
+                    <StarRating rating={review.rating} size={16} />
+                    {review.comment && (
+                      <p className="mt-2 text-gray-700 whitespace-pre-line">
+                        {review.comment}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-gray-50 rounded-xl">
+              <p className="text-gray-600">
+                Belum ada ulasan untuk produk ini.
+              </p>
+              <p className="text-sm text-gray-400 mt-1">
+                Jadilah yang pertama memberikan ulasan!
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* Related Products */}
+        <section className="mt-16">
+          <div className="flex flex-col items-center mb-8">
+            <h2 className="text-2xl font-bold text-center">
+              Produk <span className="text-accent">Terkait</span>
+            </h2>
+            <div className="w-24 h-1 bg-accent rounded-full mt-2"></div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 mt-6 pb-14 w-full">
-            {loadingRelated ? (
-              <p className="col-span-full text-center">Memuat produk terkait...</p>
-            ) : relatedProducts.length > 0 ? (
-              relatedProducts.map((product) => (
+
+          {loadingRelated ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+              {[...Array(5)].map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-gray-100 rounded-lg aspect-[3/4] animate-pulse"
+                ></div>
+              ))}
+            </div>
+          ) : relatedProducts.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+              {relatedProducts.map((product) => (
                 <ProductCard key={product.product_id} product={product} />
-              ))
-            ) : (
-              <p className="col-span-full text-center">
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-500">
                 Tidak ada produk terkait yang ditemukan.
               </p>
-            )}
+            </div>
+          )}
+
+          <div className="flex justify-center mt-8">
+            <button
+              onClick={() => router.push("/all-products")}
+              className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
+            >
+              Lihat Semua Produk <FiChevronRight />
+            </button>
           </div>
-          <button
-            onClick={() => {
-              router.push("/all-products");
-            }}
-            className="px-8 py-2 mb-16 border rounded text-gray-500/70 hover:bg-slate-50/90 transition"
-          >
-            Lihat Selengkapnya
-          </button>
-        </div>
+        </section>
       </div>
       <Footer />
     </>
-  ) : (
-    <Loading />
   );
 };
 

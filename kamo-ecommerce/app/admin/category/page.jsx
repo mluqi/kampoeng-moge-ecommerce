@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useCategory } from "@/contexts/CategoryContext";
+import { FaPencilAlt, FaTrashAlt } from "react-icons/fa";
 
 const CategoryPage = () => {
   const {
@@ -93,15 +94,15 @@ const CategoryPage = () => {
                   <td className="px-4 py-3">
                     <button
                       onClick={() => openEditModal(cat)}
-                      className="px-2 py-1 bg-blue-500 text-white rounded mr-2"
+                      className="px-2 py-1 text-accent rounded mr-2 hover:text-accent/80 cursor-pointer"
                     >
-                      Edit
+                      <FaPencilAlt className="inline" />
                     </button>
                     <button
                       onClick={() => handleDelete(cat.category_id)}
-                      className="px-2 py-1 bg-red-500 text-white rounded"
+                      className="px-2 py-1 text-accent rounded hover:text-accent/80 cursor-pointer"
                     >
-                      Delete
+                      <FaTrashAlt className="inline" />
                     </button>
                   </td>
                 </tr>

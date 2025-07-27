@@ -4,6 +4,7 @@ import { assets } from "../assets/assets";
 import Link from "next/link";
 import { useUserAuth } from "@/contexts/UserAuthContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import api from "@/service/api";
@@ -23,6 +24,7 @@ const Navbar = () => {
   const [loadingSearch, setLoadingSearch] = useState(false);
   const { user, profile, userLogout } = useUserAuth();
   const { admin, logoutAdmin } = useAuth();
+  const { cartCount } = useCart();
 
   // Debounce untuk menunda pencarian API
   useEffect(() => {
@@ -162,10 +164,19 @@ const Navbar = () => {
         {user || admin ? (
           <div className="flex items-center gap-4">
             {user && ( // Tampilkan jika user login (baik dari NextAuth atau profile sudah dimuat)
-              <FaHeart className="w-5 h-5 text-gray-200 cursor-pointer hover:text-red-500 transition-colors duration-200" />
+              <Link href="/profile?tab=wishlist" className="relative">
+                <FaHeart className="w-5 h-5 text-gray-500 cursor-pointer hover:text-red-500 transition-colors duration-200" />
+              </Link>
             )}
             {user && (
-              <FaShoppingCart className="w-5 h-5 text-gray-200 cursor-pointer hover:text-accent transition-colors duration-200" />
+              <Link href="/cart" className="relative">
+                <FaShoppingCart className="w-5 h-5 text-gray-500 cursor-pointer hover:text-accent transition-colors duration-200" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                    {cartCount}
+                  </span>
+                )}
+              </Link>
             )}
             {user && (
               <Link
@@ -202,39 +213,37 @@ const Navbar = () => {
         )}
       </div>
 
+      {/* Mobile Icons & Menu */}
       <div className="flex items-center md:hidden gap-4">
-        {user || admin ? (
-          user && profile?.user_photo ? ( // Jika user login dan punya foto profil dari backend
-            <Link
-              href="/profile"
-              className="flex items-center gap-2 cursor-pointer"
-            >
+        {user ? (
+          <>
+            <Link href="/profile?tab=wishlist" className="relative">
+              <FaHeart className="w-5 h-5 text-gray-600 hover:text-red-500" />
+            </Link>
+            <Link href="/cart" className="relative">
+              <FaShoppingCart className="w-5 h-5 text-gray-600 hover:text-accent" />
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
+            </Link>
+            <Link href="/profile">
               <Image
-                src={profile.user_photo}
-                alt={profile.user_name}
-                width={24}
-                height={24}
-                className="rounded-full"
+                src={profile?.user_photo || user.image || assets.user_icon}
+                alt="Profil"
+                width={28}
+                height={28}
+                className="rounded-full object-cover"
               />
             </Link>
-          ) : (
-            // Jika admin login atau user tanpa foto profil, tampilkan ikon logout
-            <button
-              onClick={user ? userLogout : logoutAdmin}
-              className="flex items-center gap-2"
-            >
-              <FaSignOutAlt className="w-5 h-5 text-gray-700" />
-            </button>
-          )
+          </>
         ) : (
-          <button
-            onClick={() => router.push("/account")}
-            className="flex items-center gap-2"
-          >
-            <Image src={assets.user_icon} alt="user icon" />
+          <button onClick={() => router.push("/account")}>
+            <Image src={assets.user_icon} alt="Login" width={24} height={24} />
           </button>
         )}
-        {/* Hamburger Menu Button */}
+
         <button onClick={() => setMenuOpen(!menuOpen)} className="z-20">
           {menuOpen ? (
             <svg
@@ -300,6 +309,17 @@ const Navbar = () => {
           >
             Kontak
           </Link>
+          {(user || admin) && (
+            <div className="w-full px-4 pt-2 pb-4 mt-2 border-t border-gray-200">
+              <button
+                onClick={user ? userLogout : logoutAdmin}
+                className="w-full bg-red-500 text-white flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-base font-medium hover:bg-red-600 transition-colors duration-200"
+              >
+                <FaSignOutAlt />
+                <span>Logout</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
     </nav>

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import ProductCard from "./ProductCard";
 import { useCategory } from "@/contexts/CategoryContext";
 import { useRouter } from "next/navigation";
+import { FiChevronRight } from "react-icons/fi";
 import api from "@/service/api";
 
 const HOME_PRODUCTS_LIMIT = 20;
@@ -28,6 +29,7 @@ const HomeProducts = () => {
         const params = {
           limit: HOME_PRODUCTS_LIMIT,
           category: selectedCategory === "All" ? "" : selectedCategory,
+          status: "active",
         };
         const query = new URLSearchParams(params).toString();
         const res = await api.get(`/products?${query}`);
@@ -89,12 +91,10 @@ const HomeProducts = () => {
         )}
       </div>
       <button
-        onClick={() => {
-          router.push("/all-products");
-        }}
-        className="px-12 py-2.5 border rounded text-gray-500/70 hover:bg-slate-50/90 transition"
+        onClick={() => router.push("/all-products")}
+        className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
       >
-        Lihat Selengkapnya
+        Lihat Semua Produk <FiChevronRight />
       </button>
     </div>
   );

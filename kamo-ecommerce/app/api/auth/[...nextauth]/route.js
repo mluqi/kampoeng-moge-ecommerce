@@ -29,12 +29,15 @@ const handler = NextAuth({
       if (account && profile) {
         try {
           // Kirim data pengguna ke backend untuk disimpan/diperbarui
-          const backendResponse = await backendApi.post("/auth/google-callback", {
-            googleId: profile.sub,
-            name: profile.name,
-            email: profile.email,
-            photo: profile.picture,
-          });
+          const backendResponse = await backendApi.post(
+            "/auth/google-callback",
+            {
+              googleId: profile.sub,
+              name: profile.name,
+              email: profile.email,
+              photo: profile.picture,
+            }
+          );
 
           if (backendResponse.data.success) {
             // Jika backend berhasil, tambahkan ID dan peran dari database kita ke token
@@ -44,12 +47,18 @@ const handler = NextAuth({
             token.name = backendUser.name; // Perbarui nama di token
             token.email = backendUser.email; // Perbarui email di token
           } else {
-            console.error("Backend user processing failed:", backendResponse.data.message);
+            console.error(
+              "Backend user processing failed:",
+              backendResponse.data.message
+            );
             // Jika backend gagal, Anda bisa memutuskan untuk tidak melanjutkan login
             // atau mengembalikan token tanpa data tambahan.
           }
         } catch (error) {
-          console.error("Error in JWT callback contacting backend:", error.message);
+          console.error(
+            "Error in JWT callback contacting backend:",
+            error.message
+          );
           // Jika terjadi error, kembalikan token asli tanpa modifikasi
         }
       }
@@ -66,11 +75,11 @@ const handler = NextAuth({
       return session;
     },
   },
+  secret: process.env.NEXTAUTH_SECRET,
   pages: {
-    signIn: "/account", // Arahkan ke halaman login kustom Anda
-    error: "/account", // Arahkan ke halaman login kustom pada error
+    signIn: "/account",
+    error: "/account",
   },
-  secret: process.env.NEXTAUTH_SECRET, // Secret diperlukan untuk NextAuth.js
 });
 
 export { handler as GET, handler as POST };

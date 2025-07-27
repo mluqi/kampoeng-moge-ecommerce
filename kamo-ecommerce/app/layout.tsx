@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import ClientProviders from "@/components/ClientProviders";
+import { Toaster } from "react-hot-toast";
+import ChatWidget from "@/components/ChatWidget";
+
 
 const poppinsFont = Poppins({
   variable: "--font-poppins",
@@ -24,7 +27,11 @@ export default function RootLayout({
       <body
         className={`${poppinsFont.variable} ${poppinsFont.variable} antialiased`}
       >
-        <ClientProviders>{children}</ClientProviders>
+        <ClientProviders>
+          <Toaster position="top-center" reverseOrder={false} />
+          {children}
+          <ChatWidget />
+        </ClientProviders>
       </body>
     </html>
   );

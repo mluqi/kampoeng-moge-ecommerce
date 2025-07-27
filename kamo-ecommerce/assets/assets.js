@@ -1,4 +1,5 @@
 import logo from "./logo.svg";
+import logo_circle from "./logo_circle.png";
 import logo_accent from "./logo_accent.svg";
 import search_icon from "./search_icon.svg";
 import user_icon from "./user_icon.svg";
@@ -72,6 +73,7 @@ import header_part_3 from "./product/part3.png";
 
 export const assets = {
   logo,
+  logo_circle,
   logo_accent,
   search_icon,
   user_icon,
@@ -141,7 +143,7 @@ export const assets = {
   header_part_2,
   header_part_3,
 };
-  
+
 export const BagIcon = () => {
   return (
     <svg className="w-5 h-5 text-gray-800" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">

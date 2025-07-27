@@ -1,53 +1,336 @@
 "use client";
-import React, { useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import React, { useState, useEffect, useCallback } from "react";
+import api from "@/service/api";
+import Loading from "@/components/Loading";
+import {
+  FaBoxOpen,
+  FaDollarSign,
+  FaShoppingCart,
+  FaUserPlus,
+  FaChartLine,
+  FaBoxes,
+  FaUsers,
+} from "react-icons/fa";
 import { useRouter } from "next/navigation";
-import Footer from "@/components/admin/Footer";
+import StatusBadge from "@/components/admin/StatusBadge";
+import SalesChart from "@/components/admin/SalesChart";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { Bar, Pie } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+} from "chart.js";
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+);
+
+const StatCard = ({ icon, title, value, color, onClick }) => (
+  <div
+    onClick={onClick}
+    className={`bg-white p-6 rounded-lg shadow flex items-center gap-6 border-l-4 ${color} ${
+      onClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""
+    }`}
+  >
+    <div className="text-3xl">{icon}</div>
+    <div>
+      <p className="text-sm text-gray-500 font-medium">{title}</p>
+      <p className="text-2xl font-bold text-gray-800">{value}</p>
+    </div>
+  </div>
+);
 
 const Dashboard = () => {
-  const { admin, loading } = useAuth();
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [chartData, setChartData] = useState([]);
+  const [chartLoading, setChartLoading] = useState(true);
+  const [dateRange, setDateRange] = useState([null, null]);
+  const [startDate, endDate] = dateRange;
   const router = useRouter();
-  // Data dummy
-  const stats = [
-    { label: "Total Products", value: 120 },
-    { label: "Total Orders", value: 45 },
-    { label: "Total Users", value: 30 },
-    { label: "Revenue", value: "Rp 12.000.000" },
-  ];
-  useEffect(() => {
-    if (!loading && !admin) {
-      router.replace("/account");
-    }
-  }, [admin, loading, router]);
 
-  if (loading || !admin) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-white">
-        <p>Authenticating...</p>
-      </div>
-    );
+  // Dummy data for new charts
+  const [productPerformanceData] = useState({
+    labels: ["Produk A", "Produk B", "Produk C", "Produk D", "Produk E"],
+    datasets: [
+      {
+        label: "Penjualan",
+        data: [120, 190, 90, 150, 200],
+        backgroundColor: [
+          "rgba(75, 192, 192, 0.6)",
+          "rgba(54, 162, 235, 0.6)",
+          "rgba(255, 206, 86, 0.6)",
+          "rgba(153, 102, 255, 0.6)",
+          "rgba(255, 159, 64, 0.6)",
+        ],
+        borderColor: [
+          "rgba(75, 192, 192, 1)",
+          "rgba(54, 162, 235, 1)",
+          "rgba(255, 206, 86, 1)",
+          "rgba(153, 102, 255, 1)",
+          "rgba(255, 159, 64, 1)",
+        ],
+        borderWidth: 1,
+      },
+    ],
+  });
+
+  const [customerDemographicsData] = useState({
+    labels: ["18-25", "26-35", "36-45", "46-55", "56+"],
+    datasets: [
+      {
+        label: "Distribusi Usia",
+        data: [15, 45, 25, 10, 5],
+        backgroundColor: [
+          "rgba(255, 99, 132, 0.6)",
+          "rgba(54, 162, 235, 0.6)",
+          "rgba(255, 206, 86, 0.6)",
+          "rgba(75, 192, 192, 0.6)",
+          "rgba(153, 102, 255, 0.6)",
+        ],
+        borderWidth: 1,
+      },
+    ],
+  });
+
+  const fetchDashboardData = useCallback(async () => {
+    setLoading(true);
+    setChartLoading(true);
+
+    const params = new URLSearchParams();
+    if (startDate) params.append("startDate", startDate.toISOString());
+    if (endDate) params.append("endDate", endDate.toISOString());
+
+    try {
+      // Fetch stats and chart data in parallel
+      const [statsRes, chartRes] = await Promise.all([
+        api.get(`/dashboard/stats?${params.toString()}`),
+        api.get(`/dashboard/sales-chart?${params.toString()}`),
+      ]);
+      setStats(statsRes.data);
+      setChartData(chartRes.data);
+    } catch (error) {
+      console.error("Failed to fetch dashboard data:", error);
+    } finally {
+      setLoading(false);
+      setChartLoading(false);
+    }
+  }, [startDate, endDate]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  if (loading && !stats) {
+    return <Loading />;
+  }
+
+  if (!stats) {
+    return <div className="p-8 text-center">Gagal memuat data dashboard.</div>;
   }
 
   return (
-    <>
-      <div className="flex-1 min-h-screen flex flex-col items-center justify-center bg-white">
-        <h1 className="text-2xl font-bold mb-8">Admin Dashboard</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-2xl">
-          {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-accent/10 border border-accent/30 rounded-lg p-6 flex flex-col items-center"
-            >
-              <div className="text-3xl font-bold text-accent mb-2">
-                {stat.value}
-              </div>
-              <div className="text-lg text-gray-700">{stat.label}</div>
-            </div>
-          ))}
+    <div className="flex-1 h-screen overflow-y-auto p-8 bg-gray-50">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <h2 className="text-2xl font-semibold text-gray-800">Dashboard</h2>
+        <div className="flex items-center gap-2">
+          <DatePicker
+            selectsRange={true}
+            startDate={startDate}
+            endDate={endDate}
+            onChange={(update) => {
+              setDateRange(update);
+            }}
+            isClearable={true}
+            placeholderText="Pilih rentang tanggal"
+            className="p-2 border rounded-md text-sm w-64"
+          />
+          <button
+            onClick={fetchDashboardData}
+            className="p-2 border rounded-md bg-white text-sm hover:bg-gray-50 transition"
+          >
+            Filter
+          </button>
         </div>
       </div>
-      <Footer />
-    </>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <StatCard
+          icon={<FaDollarSign className="text-green-500" />}
+          title="Total Pendapatan"
+          value={`Rp ${stats.totalRevenue.toLocaleString("id-ID")}`}
+          color="border-green-500"
+          onClick={() => router.push("/admin/orders")}
+        />
+        <StatCard
+          icon={<FaShoppingCart className="text-blue-500" />}
+          title="Total Pesanan"
+          value={stats.totalOrders}
+          color="border-blue-500"
+          onClick={() => router.push("/admin/orders")}
+        />
+        <StatCard
+          icon={<FaBoxOpen className="text-yellow-500" />}
+          title="Pesanan Baru (Hari Ini)"
+          value={stats.newOrdersToday}
+          color="border-yellow-500"
+        />
+        <StatCard
+          icon={<FaUserPlus className="text-purple-500" />}
+          title="Pengguna Baru (Hari Ini)"
+          value={stats.newUsersToday}
+          color="border-purple-500"
+          onClick={() => router.push("/admin/users")}
+        />
+      </div>
+
+      {/* Main Content Area */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        {/* Sales Chart */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-4 text-gray-800">
+            Pendapatan 7 Hari Terakhir
+          </h3>
+          <SalesChart data={chartData} loading={chartLoading} />
+        </div>
+
+        {/* Recent Orders Table */}
+        <div className="lg:col-span-1 bg-white rounded-lg shadow">
+          <h3 className="text-lg font-semibold p-6 border-b">Pesanan Terbaru</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">
+                    Order ID
+                  </th>
+                  <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">
+                    Total
+                  </th>
+                  <th className="px-6 py-3 text-right font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {stats.recentOrders.map((order) => (
+                  <tr
+                    key={order.order_id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() =>
+                      router.push(`/admin/orders/${order.order_id}`)
+                    }
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                      {order.order_id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      Rp {order.total_amount.toLocaleString("id-ID")}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <StatusBadge status={order.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {stats.recentOrders.length === 0 && (
+              <p className="text-center p-6 text-gray-500">
+                Tidak ada pesanan terbaru.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Additional Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Product Performance */}
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-4 text-gray-800">
+            Performa Produk Teratas
+          </h3>
+          <div className="h-80">
+            <Bar
+              data={productPerformanceData}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: "top",
+                  },
+                  title: {
+                    display: true,
+                    text: "5 Produk Terlaris",
+                  },
+                },
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Customer Demographics */}
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-4 text-gray-800">
+            Demografi Pelanggan
+          </h3>
+          <div className="h-80">
+            <Pie
+              data={customerDemographicsData}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: "right",
+                  },
+                },
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Additional Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8">
+        <StatCard
+          icon={<FaChartLine className="text-indigo-500" />}
+          title="Rata-rata Nilai Pesanan"
+          value={`Rp ${Math.round(stats.totalRevenue / stats.totalOrders).toLocaleString("id-ID")}`}
+          color="border-indigo-500"
+        />
+        <StatCard
+          icon={<FaBoxes className="text-orange-500" />}
+          title="Total Produk"
+          value={stats.totalProducts || "125"}
+          color="border-orange-500"
+          onClick={() => router.push("/admin/products")}
+        />
+        <StatCard
+          icon={<FaUsers className="text-teal-500" />}
+          title="Total Pelanggan"
+          value={stats.totalCustomers || "542"}
+          color="border-teal-500"
+          onClick={() => router.push("/admin/users")}
+        />
+      </div>
+    </div>
   );
 };
 

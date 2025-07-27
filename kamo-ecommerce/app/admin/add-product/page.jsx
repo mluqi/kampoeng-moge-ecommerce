@@ -1,12 +1,22 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { assets } from "@/assets/assets";
 import Image from "next/image";
-
 import { useProduct } from "@/contexts/ProductContext";
 import { useCategory } from "@/contexts/CategoryContext";
+import toast from "react-hot-toast";
+import ProductTiktokSection from "@/components/admin/ProductTiktokSection"; // 1. Impor komponen TikTok
+import dynamic from "next/dynamic";
+import "react-quill-new/dist/quill.snow.css"; // Import CSS untuk editor
+
+// Import ReactQuill secara dinamis untuk menghindari masalah SSR
+const ReactQuill = dynamic(() => import("react-quill-new"), {
+  ssr: false,
+  loading: () => <p className="text-gray-500">Memuat editor...</p>,
+});
 
 const AddProduct = () => {
+  // Preserved all context hooks and state management
   const { addProduct } = useProduct();
   const { categories, fetchCategories } = useCategory();
 
@@ -31,12 +41,67 @@ const AddProduct = () => {
     height: "",
   });
   const [annotations, setAnnotations] = useState("");
-  const [msg, setMsg] = useState("");
+  const [brand, setBrand] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Untuk validasi dan submit
+  // 2. Tambahkan state untuk menampung data spesifik dari TikTok
+  const [tiktokCategoryId, setTiktokCategoryId] = useState("");
+  const [tiktokProductAttributes, setTiktokProductAttributes] = useState([]);
+
+  // 3. Buat callback untuk menerima data dari komponen ProductTiktokSection
+  const handleTiktokDataChange = useCallback((attributeValues, categoryId) => {
+    setTiktokCategoryId(categoryId);
+
+    // Format data agar sesuai dengan struktur payload API TikTok
+    const formattedAttributes = Object.entries(attributeValues).map(
+      ([attrId, value]) => ({
+        id: attrId,
+        values: [
+          {
+            id: value.id,
+            name: value.name,
+          },
+        ],
+      })
+    );
+    setTiktokProductAttributes(formattedAttributes);
+  }, []);
+
+  // Konfigurasi modul untuk toolbar ReactQuill
+  const modules = useMemo(
+    () => ({
+      toolbar: {
+        container: [
+          [{ header: [1, 2, 3, false] }],
+          ["bold", "italic", "underline", "strike"],
+          [{ list: "ordered" }, { list: "bullet" }],
+          ["link", "image"],
+          ["clean"],
+        ],
+      },
+      clipboard: {
+        matchVisual: false,
+      },
+    }),
+    []
+  );
+
+  const formats = [
+    "header",
+    "bold",
+    "italic",
+    "underline",
+    "strike",
+    "list",
+    "link",
+    "image",
+  ];
+
+  // Preserved the handleSubmit function with added loading state
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMsg("");
+    setIsSubmitting(true);
+
     try {
       const formData = new FormData();
       formData.append("name", name);
@@ -51,6 +116,14 @@ const AddProduct = () => {
       formData.append("weight", weight);
       formData.append("dimension", JSON.stringify(dimensions));
       formData.append("annotations", annotations);
+      formData.append("brand", brand);
+
+      // 4. Tambahkan data TikTok ke FormData untuk dikirim ke backend
+      // Catatan: Backend controller perlu diupdate untuk menangani field ini
+      if (tiktokCategoryId) {
+        formData.append("tiktokCategoryId", tiktokCategoryId);
+        formData.append("tiktokProductAttributes", JSON.stringify(tiktokProductAttributes));
+      }
 
       files.forEach((file) => {
         if (file) formData.append("pictures", file);
@@ -58,7 +131,7 @@ const AddProduct = () => {
 
       const success = await addProduct(formData);
       if (success) {
-        setMsg("Produk berhasil ditambahkan!");
+        toast.success("Produk berhasil ditambahkan!");
         // Reset form
         setFiles([]);
         setName("");
@@ -73,266 +146,404 @@ const AddProduct = () => {
         setWeight("");
         setDimensions({ length: "", width: "", height: "" });
         setAnnotations("");
+        setBrand("");
+        // Reset juga state TikTok setelah berhasil
+        setTiktokCategoryId("");
+        setTiktokProductAttributes([]);
       } else {
-        setMsg("Gagal menambah produk.");
+        toast.error("Gagal menambah produk");
       }
     } catch (err) {
-      setMsg("Gagal menambah produk.");
+      toast.error("Gagal menambah produk");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="flex-1 min-h-screen flex flex-col justify-between">
-      <form onSubmit={handleSubmit} className="md:p-10 p-4 space-y-5 max-w-lg">
-        <div>
-          <p className="text-base font-medium">Product Image</p>
-          <div className="flex flex-wrap items-center gap-3 mt-2">
-            {[...Array(4)].map((_, index) => (
-              <label key={index} htmlFor={`image${index}`}>
-                <input
-                  onChange={(e) => {
-                    const updatedFiles = [...files];
-                    updatedFiles[index] = e.target.files[0];
-                    setFiles(updatedFiles);
-                  }}
-                  type="file"
-                  id={`image${index}`}
-                  hidden
-                  accept="image/png,image/jpeg,image/jpg"
-                />
-                <Image
-                  className="max-w-24 cursor-pointer"
-                  src={
-                    files[index]
-                      ? URL.createObjectURL(files[index])
-                      : assets.upload_area
-                  }
-                  alt=""
-                  width={100}
-                  height={100}
-                />
-              </label>
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-col gap-1 max-w-md">
-          <label className="text-base font-medium" htmlFor="product-name">
-            Product Name
-          </label>
-          <input
-            id="product-name"
-            type="text"
-            placeholder="Type here"
-            className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
-            onChange={(e) => setName(e.target.value)}
-            value={name}
-            required
-          />
-        </div>
-        <div className="flex flex-col gap-1 max-w-md">
-          <label
-            className="text-base font-medium"
-            htmlFor="product-description"
-          >
-            Product Description
-          </label>
-          <textarea
-            id="product-description"
-            rows={4}
-            className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40 resize-none"
-            placeholder="Type here"
-            onChange={(e) => setDescription(e.target.value)}
-            value={description}
-            required
-          ></textarea>
-        </div>
-        <div className="flex flex-col gap-1 max-w-md">
-          <label className="text-base font-medium" htmlFor="product-sku">
-            SKU
-          </label>
-          <input
-            id="product-sku"
-            type="text"
-            placeholder="SKU"
-            className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
-            onChange={(e) => setSku(e.target.value)}
-            value={sku}
-            required
-          />
-        </div>
-        <div className="flex items-center gap-5 flex-wrap">
-          <div className="flex flex-col gap-1 w-32">
-            <label className="text-base font-medium" htmlFor="category">
-              Category
-            </label>
-            <select
-              id="category"
-              className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
-              onChange={(e) => setCategory(e.target.value)}
-              value={category}
-              required
-            >
-              <option value="">Select Category</option>
-              {categories.map((cat) => (
-                <option key={cat.category_id} value={cat.category_id}>
-                  {cat.category_name}
-                </option>
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-sm p-6">
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">
+          Tambah Produk Baru
+        </h1>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Image Upload Section */}
+          <div>
+            <h2 className="text-lg font-medium text-gray-700 mb-3">
+              Gambar Produk
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[...Array(5)].map((_, index) => (
+                <div key={index} className="flex flex-col items-center">
+                  <label
+                    htmlFor={`image${index}`}
+                    className="w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-accent transition-colors"
+                  >
+                    {files[index] ? (
+                      <Image
+                        src={URL.createObjectURL(files[index])}
+                        alt="Preview"
+                        width={200}
+                        height={200}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="text-center p-4">
+                        <Image
+                          src={assets.upload_area}
+                          alt="Upload"
+                          width={48}
+                          height={48}
+                          className="mx-auto opacity-60"
+                        />
+                        <p className="text-xs text-gray-500 mt-2">
+                          Upload Gambar
+                        </p>
+                      </div>
+                    )}
+                    <input
+                      onChange={(e) => {
+                        const updatedFiles = [...files];
+                        updatedFiles[index] = e.target.files[0];
+                        setFiles(updatedFiles);
+                      }}
+                      type="file"
+                      id={`image${index}`}
+                      hidden
+                      accept="image/png,image/jpeg,image/jpg"
+                    />
+                  </label>
+                  {files[index] && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedFiles = [...files];
+                        updatedFiles[index] = null;
+                        setFiles(updatedFiles);
+                      }}
+                      className="mt-1 text-xs text-red-500 hover:text-red-700"
+                    >
+                      Hapus
+                    </button>
+                  )}
+                </div>
               ))}
-            </select>
-            {/* Untuk production, sebaiknya gunakan dropdown kategori dari DB */}
+            </div>
           </div>
-          <div className="flex flex-col gap-1 w-32">
-            <label className="text-base font-medium" htmlFor="product-price">
-              Product Price
-            </label>
-            <input
-              id="product-price"
-              type="number"
-              placeholder="0"
-              className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
-              onChange={(e) => setPrice(e.target.value)}
-              value={price}
-              required
-            />
+
+          {/* Basic Information Section */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-medium text-gray-700">
+              Informasi Dasar
+            </h2>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                  htmlFor="product-name"
+                >
+                  Nama Produk*
+                </label>
+                <input
+                  id="product-name"
+                  type="text"
+                  placeholder="Nama produk"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                  onChange={(e) => setName(e.target.value)}
+                  value={name}
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                  htmlFor="product-brand"
+                >
+                  Merek*
+                </label>
+                <input
+                  id="product-brand"
+                  type="text"
+                  placeholder="Merek produk"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                  onChange={(e) => setBrand(e.target.value)}
+                  value={brand}
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                  htmlFor="product-sku"
+                >
+                  SKU*
+                </label>
+                <input
+                  id="product-sku"
+                  type="text"
+                  placeholder="Kode SKU"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                  onChange={(e) => setSku(e.target.value)}
+                  value={sku}
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                  htmlFor="category"
+                >
+                  Kategori*
+                </label>
+                <select
+                  id="category"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                  onChange={(e) => setCategory(e.target.value)}
+                  value={category}
+                  required
+                >
+                  <option value="">Pilih Kategori</option>
+                  {categories.map((cat) => (
+                    <option key={cat.category_id} value={cat.category_id}>
+                      {cat.category_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                  htmlFor="product-price"
+                >
+                  Harga (Rp)*
+                </label>
+                <input
+                  id="product-price"
+                  type="number"
+                  placeholder="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                  onChange={(e) => setPrice(e.target.value)}
+                  value={price}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label
+                className="block text-sm font-medium text-gray-700 mb-1"
+                htmlFor="product-description"
+              >
+                Deskripsi Produk*
+              </label>
+              <div className="bg-white rounded-md border border-gray-300 focus-within:ring-1 focus-within:ring-accent focus-within:border-accent">
+                <ReactQuill
+                  theme="snow"
+                  value={description}
+                  onChange={setDescription}
+                  modules={modules}
+                  formats={formats}
+                  placeholder="Deskripsi lengkap produk..."
+                  className="h-64 [&_.ql-editor]:min-h-[200px]"
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Gunakan editor untuk memformat deskripsi produk Anda.
+              </p>
+            </div>
           </div>
-          <div className="flex flex-col gap-1 w-32">
-            <label className="text-base font-medium" htmlFor="product-stock">
-              Stock
-            </label>
-            <input
-              id="product-stock"
-              type="number"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="0"
-              className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
-              onChange={(e) => setStock(e.target.value)}
-              value={stock}
-              required
-            />
+
+          {/* Inventory Section */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-medium text-gray-700">Persediaan</h2>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <label
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                  htmlFor="product-stock"
+                >
+                  Stok*
+                </label>
+                <input
+                  id="product-stock"
+                  type="number"
+                  placeholder="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                  onChange={(e) => setStock(e.target.value)}
+                  value={stock}
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                  htmlFor="min-order"
+                >
+                  Minimal Pesanan*
+                </label>
+                <input
+                  id="min-order"
+                  type="number"
+                  placeholder="1"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                  onChange={(e) => setMinOrder(e.target.value)}
+                  value={minOrder}
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                  htmlFor="condition"
+                >
+                  Kondisi*
+                </label>
+                <select
+                  id="condition"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                  onChange={(e) => setCondition(e.target.value)}
+                  value={condition}
+                  required
+                >
+                  <option value="Baru">Baru</option>
+                  <option value="Bekas">Bekas</option>
+                </select>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-col gap-1 w-32">
-            <label className="text-base font-medium" htmlFor="min-order">
-              Min Order
-            </label>
-            <input
-              id="min-order"
-              type="number"
-              placeholder="1"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
-              onChange={(e) => setMinOrder(e.target.value)}
-              value={minOrder}
-              required
-            />
+
+          {/* Shipping Section */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-medium text-gray-700">Pengiriman</h2>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                  htmlFor="weight"
+                >
+                  Berat (kg)*
+                </label>
+                <input
+                  id="weight"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                  onChange={(e) => setWeight(e.target.value)}
+                  value={weight}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Dimensi (cm)*
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder="Panjang"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                    value={dimensions.length}
+                    onChange={(e) =>
+                      setDimensions((d) => ({ ...d, length: e.target.value }))
+                    }
+                    required
+                  />
+                  <input
+                    type="number"
+                    placeholder="Lebar"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                    value={dimensions.width}
+                    onChange={(e) =>
+                      setDimensions((d) => ({ ...d, width: e.target.value }))
+                    }
+                    required
+                  />
+                  <input
+                    type="number"
+                    placeholder="Tinggi"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                    value={dimensions.height}
+                    onChange={(e) =>
+                      setDimensions((d) => ({ ...d, height: e.target.value }))
+                    }
+                    required
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-5 flex-wrap">
-          <div className="flex flex-col gap-1 w-32">
-            <label className="text-base font-medium" htmlFor="condition">
-              Condition
-            </label>
-            <select
-              id="condition"
-              className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
-              onChange={(e) => setCondition(e.target.value)}
-              value={condition}
-              required
+
+          {/* Additional Information */}
+          <div>
+            <label
+              className="block text-sm font-medium text-gray-700 mb-1"
+              htmlFor="annotations"
             >
-              <option value="Baru">Baru</option>
-              <option value="Bekas">Bekas</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-1 w-32">
-            <label className="text-base font-medium" htmlFor="status">
-              Status
+              Catatan Tambahan
             </label>
-            <select
-              id="status"
-              className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
-              onChange={(e) => setStatus(e.target.value)}
-              value={status}
-              required
+            <textarea
+              id="annotations"
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+              placeholder="Catatan tambahan tentang produk"
+              onChange={(e) => setAnnotations(e.target.value)}
+              value={annotations}
+            ></textarea>
+          </div>
+
+          {/* --- 5. Render Komponen TikTok Shop --- */}
+          <div className="pt-6 border-t border-gray-200">
+            <ProductTiktokSection
+              onAttributesChange={handleTiktokDataChange}
+              // Tidak perlu initial value karena ini form tambah produk baru
+            />
+          </div>
+
+
+          {/* Status */}
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+            <div>
+              <label
+                className="block text-sm font-medium text-gray-700 mb-1"
+                htmlFor="status"
+              >
+                Status Produk*
+              </label>
+              <select
+                id="status"
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                onChange={(e) => setStatus(e.target.value)}
+                value={status}
+                required
+              >
+                <option value="active">Aktif</option>
+                <option value="inactive">Tidak Aktif</option>
+              </select>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`px-6 py-2.5 rounded-md text-white font-medium ${
+                isSubmitting
+                  ? "bg-accent/70 cursor-not-allowed"
+                  : "bg-accent hover:bg-accent/90"
+              }`}
             >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+              {isSubmitting ? "Menyimpan..." : "Simpan Produk"}
+            </button>
           </div>
-          <div className="flex flex-col gap-1 w-32">
-            <label className="text-base font-medium" htmlFor="weight">
-              Weight (kg)
-            </label>
-            <input
-              id="weight"
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
-              onChange={(e) => setWeight(e.target.value)}
-              value={weight}
-              required
-            />
-          </div>
-        </div>
-        <div className="flex flex-col gap-1 max-w-md">
-          <label className="text-base font-medium" htmlFor="dimensions">
-            Dimensions (cm)
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              placeholder="Length"
-              className="outline-none py-2 px-2 rounded border border-gray-500/40 w-20"
-              value={dimensions.length}
-              onChange={(e) =>
-                setDimensions((d) => ({ ...d, length: e.target.value }))
-              }
-              required
-            />
-            <input
-              type="number"
-              placeholder="Width"
-              className="outline-none py-2 px-2 rounded border border-gray-500/40 w-20"
-              value={dimensions.width}
-              onChange={(e) =>
-                setDimensions((d) => ({ ...d, width: e.target.value }))
-              }
-              required
-            />
-            <input
-              type="number"
-              placeholder="Height"
-              className="outline-none py-2 px-2 rounded border border-gray-500/40 w-20"
-              value={dimensions.height}
-              onChange={(e) =>
-                setDimensions((d) => ({ ...d, height: e.target.value }))
-              }
-              required
-            />
-          </div>
-        </div>
-        <div className="flex flex-col gap-1 max-w-md">
-          <label className="text-base font-medium" htmlFor="annotations">
-            Annotations
-          </label>
-          <textarea
-            id="annotations"
-            rows={2}
-            className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40 resize-none"
-            placeholder="Type here"
-            onChange={(e) => setAnnotations(e.target.value)}
-            value={annotations}
-          ></textarea>
-        </div>
-        {msg && <div className="text-sm text-accent font-medium">{msg}</div>}
-        <button
-          type="submit"
-          className="px-8 py-2.5 bg-accent text-white font-medium rounded"
-        >
-          ADD
-        </button>
-      </form>
+        </form>
+      </div>
     </div>
   );
 };

@@ -10,14 +10,26 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
+  const fetchAdminProfile = async () => {
     const token = localStorage.getItem("token");
     if (token) {
-      setAdmin(true);
+      try {
+        // api instance should automatically include the token in headers
+        const res = await api.get("/auth/admin/me");
+        setAdmin(res.data); // Store the full admin object
+      } catch (error) {
+        console.error("Failed to fetch admin profile, logging out.", error);
+        localStorage.removeItem("token");
+        setAdmin(null);
+      }
     } else {
-      setAdmin(false);
+      setAdmin(null);
     }
     setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchAdminProfile();
   }, []);
 
   const loginAdmin = async ({ email, password }) => {
@@ -25,7 +37,7 @@ export const AuthProvider = ({ children }) => {
       const res = await api.post("/auth/admin/signin", { email, password });
       if (res.data.token) {
         localStorage.setItem("token", res.data.token);
-        setAdmin(true);
+        await fetchAdminProfile(); // Fetch profile after getting token
         router.push("/admin");
         return { success: true };
       }
@@ -45,7 +57,7 @@ export const AuthProvider = ({ children }) => {
       console.log(e);
     }
     localStorage.removeItem("token");
-    setAdmin(null);
+    setAdmin(null); // Clear admin state on logout
     router.push("/account");
     return { success: true };
   };

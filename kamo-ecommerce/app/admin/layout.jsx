@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import Sidebar from "@/components/admin/Sidebar";
 import Loading from "@/components/Loading";
 import Navbar from "../../components/admin/Navbar";
+import { AdminChatProvider } from "../../contexts/AdminChatContext";
 
 export default function AdminLayout({ children }) {
   const { admin, loading } = useAuth();
@@ -22,12 +23,15 @@ export default function AdminLayout({ children }) {
 
   // Jika terautentikasi, tampilkan layout admin dengan children (halaman sebenarnya)
   return (
-    <>
-      <Navbar/>
-    <div className="flex min-h-screen bg-gray-50/50">
-      <Sidebar />
-      <main className="flex-1">{children}</main>
-    </div>
-    </>
+    <AdminChatProvider>
+      <div className="flex flex-col h-screen bg-gray-50/50">
+        <Navbar />
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar />
+          {/* Area konten utama sekarang bisa di-scroll secara independen */}
+          <main className="flex-1 overflow-y-auto">{children}</main>
+        </div>
+      </div>
+    </AdminChatProvider>
   );
 }

@@ -1,20 +1,35 @@
-import React from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import { assets } from "@/assets/assets";
 import Image from "next/image";
-
+import api from "@/service/api";
 import { FaInstagram, FaFacebook } from "react-icons/fa";
 
 const Footer = () => {
+  const [settings, setSettings] = useState(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        // API ini sudah mengelompokkan data berdasarkan 'group'
+        const res = await api.get("/settings");
+        setSettings(res.data);
+      } catch (error) {
+        console.error("Gagal memuat pengaturan footer:", error);
+      }
+    };
+    fetchSettings();
+  }, []);
+
   return (
     <footer>
       <div className="flex flex-col md:flex-row items-start justify-center px-6 md:px-16 lg:px-32 gap-10 py-14 text-gray-500 border-t border-gray-200">
         <div className="w-4/5">
           <Image className="w-28 md:w-32" src={assets.logo_accent} alt="logo" />
           <p className="mt-6 text-sm">
-            Lorem Ipsum is simply dummy text of the printing and typesetting
-            industry. Lorem Ipsum has been the industry's standard dummy text
-            ever since the 1500s, when an unknown printer took a galley of type
-            and scrambled it to make a type specimen book.
+            {settings?.footer?.description ||
+              "Memuat deskripsi..."}
           </p>
         </div>
 
@@ -66,8 +81,8 @@ const Footer = () => {
           <div>
             <h2 className="font-medium text-gray-900 mb-5">Kontak Kami</h2>
             <div className="text-sm space-y-2">
-              <p>+1-234-567-890</p>
-              <p>contact@greatstack.dev</p>
+              <p>{settings?.footer?.phone || "..."}</p>
+              <p>{settings?.footer?.email || "..."}</p>
             </div>
           </div>
         </div>
@@ -75,10 +90,18 @@ const Footer = () => {
           <div>
             <h2 className="font-medium text-gray-900 mb-5">Sosial Media</h2>
             <div className="text-sm space-y-2 flex md:flex-row gap-4">
-              <a href="https://www.instagram.com/kampoengmoge/">
+              <a
+                href={settings?.footer?.instagram_url || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <FaInstagram />
               </a>
-              <a href="https://www.facebook.com/kampoengmogeparts">
+              <a
+                href={settings?.footer?.facebook_url || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <FaFacebook />
               </a>
             </div>

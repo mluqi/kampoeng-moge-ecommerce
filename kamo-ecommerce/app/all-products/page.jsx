@@ -7,7 +7,7 @@ import Loading from "@/components/Loading";
 import { useProduct } from "@/contexts/ProductContext";
 import { useCategory } from "@/contexts/CategoryContext";
 
-const PRODUCTS_PER_PAGE = 12;
+const PRODUCTS_PER_PAGE = 10;
 
 const AllProducts = () => {
   const { products, loading, fetchProducts } = useProduct();
@@ -37,6 +37,7 @@ const AllProducts = () => {
       limit: PRODUCTS_PER_PAGE,
       category: selectedCategory === "All" ? "" : selectedCategory,
       search: debouncedSearchTerm,
+      status: "active",
     });
   }, [currentPage, selectedCategory, debouncedSearchTerm, fetchProducts]);
 
@@ -113,7 +114,7 @@ const AllProducts = () => {
               <ProductCard key={product.product_id} product={product} />
             ))
           ) : (
-            <p className="text-gray-500 col-span-full text-center mt-12">
+            <p className="text-gray-500 col-span-full text-center mt-12 min-h-[340px]">
               Tidak ada produk ditemukan.
             </p>
           )}

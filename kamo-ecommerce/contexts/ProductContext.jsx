@@ -25,7 +25,12 @@ export const ProductProvider = ({ children }) => {
       setProducts(res.data);
     } catch (err) {
       setError(err?.response?.data?.message || "Gagal mengambil produk");
-      setProducts({ data: [], totalPages: 1, currentPage: 1, totalProducts: 0 });
+      setProducts({
+        data: [],
+        totalPages: 1,
+        currentPage: 1,
+        totalProducts: 0,
+      });
     } finally {
       setLoading(false);
     }
@@ -82,6 +87,21 @@ export const ProductProvider = ({ children }) => {
     }
   };
 
+  const updateProductStatus = async (id, status) => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.put(`/products/${id}/status`, { status });
+      await fetchProducts(lastFetchParams);
+      return res.data;
+    } catch (err) {
+      setError(err?.response?.data?.message || "Gagal update status produk");
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Hapus produk
   const deleteProduct = async (id) => {
     setLoading(true);
@@ -108,6 +128,7 @@ export const ProductProvider = ({ children }) => {
         fetchProductById,
         addProduct,
         updateProduct,
+        updateProductStatus,
         deleteProduct,
         setProducts,
       }}
