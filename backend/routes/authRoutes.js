@@ -9,23 +9,27 @@ const {
   resetPassword,
   googleAuthCallback,
   getProfile,
+  getAdminProfile,
   editProfile,
   addAddress,
   editAddress,
+  deleteAddress,
+  setDefaultAddress,
 } = require("../controllers/authController");
 
-
-// Rute ini akan menerima data pengguna dari NextAuth.js setelah Google OAuth
-router.post("/google-callback", googleAuthCallback); 
+router.post("/google-callback", googleAuthCallback);
 router.get("/profile", getProfile);
 router.put("/profile", editProfile);
 
 router.post("/address", addAddress);
-router.put("/address", editAddress);
+router.put("/address/:id", editAddress);
+router.delete("/address/:id", deleteAddress);
+router.patch("/address/:id/default", setDefaultAddress);
 
 router.post("/admin/signin", adminSignin);
+router.get("/admin/me", authMiddleware, getAdminProfile);
 router.post("/admin/logout", authMiddleware, adminLogout);
 router.post("/admin/change-password", authMiddleware, changePassword);
-router.post("/admin/reset-password", resetPassword);
+router.post("/admin/reset-password", authMiddleware, resetPassword);
 
 module.exports = router;

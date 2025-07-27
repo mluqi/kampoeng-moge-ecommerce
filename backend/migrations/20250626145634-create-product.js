@@ -5,9 +5,8 @@ module.exports = {
     await queryInterface.createTable('Products', {
       product_id: {
         allowNull: false,
-        autoIncrement: true,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        type: Sequelize.STRING
       },
       product_name: {
         type: Sequelize.STRING
@@ -34,7 +33,13 @@ module.exports = {
         type: Sequelize.STRING
       },
       product_category: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
+        references: {
+          model: 'Categories', 
+          key: 'category_id',
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL',
       },
       product_weight: {
         type: Sequelize.FLOAT

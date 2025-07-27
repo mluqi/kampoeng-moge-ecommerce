@@ -12,6 +12,12 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "product_category",
         as: "category",
       });
+      Product.hasMany(models.Wishlist, { foreignKey: "product_id" });
+      Product.hasMany(models.CartItem, { foreignKey: "product_id" });
+      Product.hasMany(models.Review, {
+        foreignKey: "product_id",
+        as: "reviews",
+      });
     }
   }
   Product.init(
@@ -36,13 +42,27 @@ module.exports = (sequelize, DataTypes) => {
           key: "category_id",
         },
       },
+      product_tiktok_id: DataTypes.STRING,
+      product_tiktok_sku_id: DataTypes.STRING,
+      product_categories_tiktok: DataTypes.STRING,
+      product_attributes_tiktok: DataTypes.JSON,
       product_weight: DataTypes.FLOAT,
       product_dimensions: DataTypes.JSON,
       product_pictures: DataTypes.JSON,
       product_wholesale_prices: DataTypes.JSON,
       product_logistics: DataTypes.JSON,
       product_annotations: DataTypes.JSON,
-      product_is_must_insurance: DataTypes.BOOLEAN,
+      product_brand: DataTypes.STRING,
+      product_average_rating: {
+        type: DataTypes.DECIMAL,
+        allowNull: true,
+        defaultValue: null,
+      },
+      product_review_count: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: 0,
+      },
     },
     {
       sequelize,
