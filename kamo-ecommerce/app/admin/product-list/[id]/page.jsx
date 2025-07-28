@@ -726,7 +726,7 @@ const ProductDetailEdit = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Deskripsi*
                       </label>
-                      <div className="bg-white rounded-md border border-gray-300 focus-within:ring-1 focus-within:ring-accent focus-within:border-accent">
+                      <div className="relative border border-gray-300 rounded-md overflow-hidden bg-white focus-within:ring-1 focus-within:ring-accent focus-within:border-accent">
                         <ReactQuill
                           theme="snow"
                           value={form.description}
@@ -736,7 +736,7 @@ const ProductDetailEdit = () => {
                           modules={modules}
                           formats={formats}
                           placeholder="Deskripsi lengkap produk..."
-                          className="h-64 [&_.ql-editor]:min-h-[200px]"
+                          className="[&_.ql-toolbar]:border-0 [&_.ql-toolbar]:border-b [&_.ql-toolbar]:border-gray-200 [&_.ql-toolbar]:bg-gray-50 [&_.ql-container]:border-0 [&_.ql-editor]:min-h-[200px] [&_.ql-editor]:max-h-[400px] [&_.ql-editor]:overflow-y-auto [&_.ql-editor]:bg-white"
                         />
                       </div>
                     </div>

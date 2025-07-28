@@ -45,25 +45,29 @@ const AddProduct = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 2. Tambahkan state untuk menampung data spesifik dari TikTok
+  const [categoryKeyword, setCategoryKeyword] = useState("");
   const [tiktokCategoryId, setTiktokCategoryId] = useState("");
   const [tiktokProductAttributes, setTiktokProductAttributes] = useState([]);
+  const [descriptionLength, setDescriptionLength] = useState(0);
 
   // 3. Buat callback untuk menerima data dari komponen ProductTiktokSection
-  const handleTiktokDataChange = useCallback((attributeValues, categoryId) => {
+  const handleTiktokDataChange = useCallback((attributeValues, categoryId, keyword) => {
     setTiktokCategoryId(categoryId);
+    setCategoryKeyword(keyword);
 
     // Format data agar sesuai dengan struktur payload API TikTok
-    const formattedAttributes = Object.entries(attributeValues).map(
-      ([attrId, value]) => ({
-        id: attrId,
-        values: [
-          {
-            id: value.id,
-            name: value.name,
-          },
-        ],
-      })
-    );
+    const formattedAttributes = Object.entries(attributeValues)
+      .filter(([, value]) => value && value.name) // Filter atribut yang punya value
+      .map(([attrId, value]) => {
+        const attributeValue = { name: value.name };
+        if (value.id) {
+          attributeValue.id = value.id;
+        }
+        return {
+          id: attrId,
+          values: [attributeValue],
+        };
+      });
     setTiktokProductAttributes(formattedAttributes);
   }, []);
 
@@ -102,6 +106,61 @@ const AddProduct = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
+    // --- START: Frontend Validation ---
+    if (name.length < 25 || name.length > 255) {
+      toast.error("Judul produk harus antara 25 dan 255 karakter.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    const plainTextDescription = description.replace(/<[^>]*>?/gm, "").trim();
+    if (
+      plainTextDescription.length < 60 ||
+      plainTextDescription.length > 10000
+    ) {
+      toast.error("Deskripsi produk harus antara 60 dan 10.000 karakter.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    const { length, width, height } = dimensions;
+    const weightKg = parseFloat(weight);
+
+    if (
+      !length ||
+      !width ||
+      !height ||
+      parseFloat(length) <= 0 ||
+      parseFloat(length) > 60 ||
+      parseFloat(width) <= 0 ||
+      parseFloat(width) > 60 ||
+      parseFloat(height) <= 0 ||
+      parseFloat(height) > 60
+    ) {
+      toast.error(
+        "Setiap dimensi (panjang, lebar, tinggi) harus antara 0.01 dan 60 cm."
+      );
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (weightKg > 0) {
+      const chargeableWeightRatio =
+        (parseFloat(length) * parseFloat(width) * parseFloat(height)) /
+        6000 /
+        weightKg;
+      if (chargeableWeightRatio >= 1.1) {
+        toast.error(
+          `Rasio berat yang dapat ditagih terlalu tinggi (${chargeableWeightRatio.toFixed(
+            2
+          )}). Seharusnya kurang dari 1.1.`
+        );
+        setIsSubmitting(false);
+        return;
+      }
+    }
+    // --- END: Frontend Validation ---
+
     try {
       const formData = new FormData();
       formData.append("name", name);
@@ -122,7 +181,11 @@ const AddProduct = () => {
       // Catatan: Backend controller perlu diupdate untuk menangani field ini
       if (tiktokCategoryId) {
         formData.append("tiktokCategoryId", tiktokCategoryId);
-        formData.append("tiktokProductAttributes", JSON.stringify(tiktokProductAttributes));
+        formData.append(
+          "tiktokProductAttributes",
+          JSON.stringify(tiktokProductAttributes)
+        );
+        formData.append("categoryKeyword", categoryKeyword);
       }
 
       files.forEach((file) => {
@@ -149,6 +212,7 @@ const AddProduct = () => {
         setBrand("");
         // Reset juga state TikTok setelah berhasil
         setTiktokCategoryId("");
+        setCategoryKeyword("");
         setTiktokProductAttributes([]);
       } else {
         toast.error("Gagal menambah produk");
@@ -167,7 +231,7 @@ const AddProduct = () => {
           Tambah Produk Baru
         </h1>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" noValidate>
           {/* Image Upload Section */}
           <div>
             <h2 className="text-lg font-medium text-gray-700 mb-3">
@@ -252,6 +316,8 @@ const AddProduct = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
                   onChange={(e) => setName(e.target.value)}
                   value={name}
+                  minLength={25}
+                  maxLength={255}
                   required
                 />
               </div>
@@ -341,19 +407,26 @@ const AddProduct = () => {
               >
                 Deskripsi Produk*
               </label>
-              <div className="bg-white rounded-md border border-gray-300 focus-within:ring-1 focus-within:ring-accent focus-within:border-accent">
+              <div className="relative border border-gray-300 rounded-md overflow-hidden bg-white focus-within:ring-1 focus-within:ring-accent focus-within:border-accent">
                 <ReactQuill
                   theme="snow"
                   value={description}
-                  onChange={setDescription}
+                  onChange={(content, delta, source, editor) => {
+                    setDescription(content);
+                    const plainText = editor.getText().trim();
+                    setDescriptionLength(plainText.length);
+                  }}
                   modules={modules}
                   formats={formats}
                   placeholder="Deskripsi lengkap produk..."
-                  className="h-64 [&_.ql-editor]:min-h-[200px]"
+                  className="[&_.ql-toolbar]:border-0 [&_.ql-toolbar]:border-b [&_.ql-toolbar]:border-gray-200 [&_.ql-toolbar]:bg-gray-50 [&_.ql-container]:border-0 [&_.ql-editor]:min-h-[200px] [&_.ql-editor]:max-h-[400px] [&_.ql-editor]:overflow-y-auto [&_.ql-editor]:bg-white"
                 />
               </div>
-              <p className="mt-1 text-xs text-gray-500">
-                Gunakan editor untuk memformat deskripsi produk Anda.
+              <p className="mt-1 text-xs text-gray-500 flex justify-between">
+                <span>Gunakan editor untuk memformat deskripsi produk Anda.</span>
+                <span className={descriptionLength < 60 || descriptionLength > 10000 ? 'text-red-500 font-medium' : 'text-gray-500'}>
+                  Karakter: {descriptionLength} (min 60, max 10000)
+                </span>
               </p>
             </div>
           </div>
@@ -507,7 +580,6 @@ const AddProduct = () => {
               // Tidak perlu initial value karena ini form tambah produk baru
             />
           </div>
-
 
           {/* Status */}
           <div className="flex items-center justify-between pt-4 border-t border-gray-200">

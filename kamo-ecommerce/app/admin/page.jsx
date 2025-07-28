@@ -63,49 +63,104 @@ const Dashboard = () => {
   const [startDate, endDate] = dateRange;
   const router = useRouter();
 
-  // Dummy data for new charts
-  const [productPerformanceData] = useState({
-    labels: ["Produk A", "Produk B", "Produk C", "Produk D", "Produk E"],
-    datasets: [
-      {
-        label: "Penjualan",
-        data: [120, 190, 90, 150, 200],
-        backgroundColor: [
-          "rgba(75, 192, 192, 0.6)",
-          "rgba(54, 162, 235, 0.6)",
-          "rgba(255, 206, 86, 0.6)",
-          "rgba(153, 102, 255, 0.6)",
-          "rgba(255, 159, 64, 0.6)",
+  // Transform best selling products data for chart
+  const getProductPerformanceData = () => {
+    console.log("stats", stats);
+    if (!stats?.bestSellingProducts || stats.bestSellingProducts.length === 0) {
+      return {
+        labels: ["Tidak ada data"],
+        datasets: [
+          {
+            label: "Penjualan",
+            data: [0],
+            backgroundColor: ["rgba(156, 163, 175, 0.6)"],
+            borderColor: ["rgba(156, 163, 175, 1)"],
+            borderWidth: 1,
+          },
         ],
-        borderColor: [
-          "rgba(75, 192, 192, 1)",
-          "rgba(54, 162, 235, 1)",
-          "rgba(255, 206, 86, 1)",
-          "rgba(153, 102, 255, 1)",
-          "rgba(255, 159, 64, 1)",
-        ],
-        borderWidth: 1,
-      },
-    ],
-  });
+      };
+    }
 
-  const [customerDemographicsData] = useState({
-    labels: ["18-25", "26-35", "36-45", "46-55", "56+"],
-    datasets: [
-      {
-        label: "Distribusi Usia",
-        data: [15, 45, 25, 10, 5],
-        backgroundColor: [
-          "rgba(255, 99, 132, 0.6)",
-          "rgba(54, 162, 235, 0.6)",
-          "rgba(255, 206, 86, 0.6)",
-          "rgba(75, 192, 192, 0.6)",
-          "rgba(153, 102, 255, 0.6)",
+    return {
+      labels: stats.bestSellingProducts.map(
+        (product) => `Produk ${product.product_id}`
+      ),
+      datasets: [
+        {
+          label: "Total Terjual",
+          data: stats.bestSellingProducts.map(
+            (product) => product.totalQuantity
+          ),
+          backgroundColor: [
+            "rgba(75, 192, 192, 0.6)",
+            "rgba(54, 162, 235, 0.6)",
+            "rgba(255, 206, 86, 0.6)",
+            "rgba(153, 102, 255, 0.6)",
+            "rgba(255, 159, 64, 0.6)",
+          ],
+          borderColor: [
+            "rgba(75, 192, 192, 1)",
+            "rgba(54, 162, 235, 1)",
+            "rgba(255, 206, 86, 1)",
+            "rgba(153, 102, 255, 1)",
+            "rgba(255, 159, 64, 1)",
+          ],
+          borderWidth: 1,
+        },
+      ],
+    };
+  };
+
+  // Transform payment methods data for chart
+  const getPaymentMethodsData = () => {
+    if (
+      !stats?.favoritePaymentMethods ||
+      stats.favoritePaymentMethods.length === 0
+    ) {
+      return {
+        labels: ["Tidak ada data"],
+        datasets: [
+          {
+            label: "Metode Pembayaran",
+            data: [0],
+            backgroundColor: ["rgba(156, 163, 175, 0.6)"],
+            borderWidth: 1,
+          },
         ],
-        borderWidth: 1,
-      },
-    ],
-  });
+      };
+    }
+
+    return {
+      labels: stats.favoritePaymentMethods.map((method) => {
+        const methodNames = {
+          bank_transfer: "Transfer Bank",
+          credit_card: "Kartu Kredit",
+          e_wallet: "E-Wallet",
+          qris: "QRIS",
+          virtual_account: "Virtual Account",
+          cash_on_delivery: "COD",
+        };
+        return methodNames[method.payment_method] || method.payment_method;
+      }),
+      datasets: [
+        {
+          label: "Jumlah Penggunaan",
+          data: stats.favoritePaymentMethods.map((method) =>
+            parseInt(method.count)
+          ),
+          backgroundColor: [
+            "rgba(255, 99, 132, 0.6)",
+            "rgba(54, 162, 235, 0.6)",
+            "rgba(255, 206, 86, 0.6)",
+            "rgba(75, 192, 192, 0.6)",
+            "rgba(153, 102, 255, 0.6)",
+            "rgba(255, 159, 64, 0.6)",
+          ],
+          borderWidth: 1,
+        },
+      ],
+    };
+  };
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
@@ -189,6 +244,7 @@ const Dashboard = () => {
           title="Pesanan Baru (Hari Ini)"
           value={stats.newOrdersToday}
           color="border-yellow-500"
+          onClick={() => router.push("/admin/orders")}
         />
         <StatCard
           icon={<FaUserPlus className="text-purple-500" />}
@@ -197,10 +253,24 @@ const Dashboard = () => {
           color="border-purple-500"
           onClick={() => router.push("/admin/users")}
         />
+        <StatCard
+          icon={<FaBoxes className="text-orange-500" />}
+          title="Total Produk Terjual"
+          value={stats.totalProductSold || "125"}
+          color="border-orange-500"
+          onClick={() => router.push("/admin/product-list")}
+        />
+        <StatCard
+          icon={<FaUsers className="text-teal-500" />}
+          title="Total Pelanggan"
+          value={stats.totalCustomers}
+          color="border-teal-500"
+          onClick={() => router.push("/admin/users")}
+        />
       </div>
 
       {/* Main Content Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-8">
         {/* Sales Chart */}
         <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4 text-gray-800">
@@ -210,8 +280,10 @@ const Dashboard = () => {
         </div>
 
         {/* Recent Orders Table */}
-        <div className="lg:col-span-1 bg-white rounded-lg shadow">
-          <h3 className="text-lg font-semibold p-6 border-b">Pesanan Terbaru</h3>
+        <div className="lg:col-span-2 bg-white rounded-lg shadow">
+          <h3 className="text-lg font-semibold p-6 border-b">
+            Pesanan Terbaru
+          </h3>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-50">
@@ -263,72 +335,72 @@ const Dashboard = () => {
         {/* Product Performance */}
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4 text-gray-800">
-            Performa Produk Teratas
+            Produk Terlaris
           </h3>
           <div className="h-80">
-            <Bar
-              data={productPerformanceData}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: {
-                    position: "top",
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+              </div>
+            ) : (
+              <Bar
+                data={getProductPerformanceData()}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: "top",
+                    },
+                    title: {
+                      display: true,
+                      text: "5 Produk Terlaris",
+                    },
                   },
-                  title: {
-                    display: true,
-                    text: "5 Produk Terlaris",
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        stepSize: 1,
+                      },
+                    },
                   },
-                },
-              }}
-            />
+                }}
+              />
+            )}
           </div>
         </div>
 
-        {/* Customer Demographics */}
+        {/* Payment Methods */}
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4 text-gray-800">
-            Demografi Pelanggan
+            Metode Pembayaran Favorit
           </h3>
           <div className="h-80">
-            <Pie
-              data={customerDemographicsData}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: {
-                    position: "right",
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+              </div>
+            ) : (
+              <Pie
+                data={getPaymentMethodsData()}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: "right",
+                    },
+                    title: {
+                      display: true,
+                      text: "Distribusi Metode Pembayaran",
+                    },
                   },
-                },
-              }}
-            />
+                }}
+              />
+            )}
           </div>
         </div>
-      </div>
-
-      {/* Additional Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8">
-        <StatCard
-          icon={<FaChartLine className="text-indigo-500" />}
-          title="Rata-rata Nilai Pesanan"
-          value={`Rp ${Math.round(stats.totalRevenue / stats.totalOrders).toLocaleString("id-ID")}`}
-          color="border-indigo-500"
-        />
-        <StatCard
-          icon={<FaBoxes className="text-orange-500" />}
-          title="Total Produk"
-          value={stats.totalProducts || "125"}
-          color="border-orange-500"
-          onClick={() => router.push("/admin/products")}
-        />
-        <StatCard
-          icon={<FaUsers className="text-teal-500" />}
-          title="Total Pelanggan"
-          value={stats.totalCustomers || "542"}
-          color="border-teal-500"
-          onClick={() => router.push("/admin/users")}
-        />
       </div>
     </div>
   );
