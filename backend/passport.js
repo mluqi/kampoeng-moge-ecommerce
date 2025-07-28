@@ -19,7 +19,11 @@ passport.use(
           user_avatar: profile.photos[0].value,
         });
       }
-      const token = jwt.sign({ id: user.user_id, role: "user" }, process.env.JWT_SECRET, { expiresIn: "1d" });
+      const token = jwt.sign(
+        { id: user.user_id, role: "user" },
+        process.env.JWT_SECRET,
+        { expiresIn: "1d" }
+      );
       user.token = token;
       await user.save();
       return done(null, user);

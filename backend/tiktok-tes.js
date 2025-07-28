@@ -7,7 +7,8 @@ const {
   uploadImage,
   getCategories,
   getCategoryAttributes,
-  refreshToken
+  refreshToken,
+  searchProducts,
 } = require("./services/tiktokShop");
 
 // 1. Definisikan semua path gambar dalam sebuah array
@@ -168,7 +169,7 @@ const testGetAttributes = async () => {
 const testUpdateProduct = async () => {
   try {
     // Ganti dengan ID produk yang valid dan ingin Anda update
-    const productIdToUpdate = "1732024344869962961";
+    const productIdToUpdate = "1732031470104118481";
     console.log(`🚀 Mengupdate produk dengan ID: ${productIdToUpdate}...`);
 
     // Anda bisa mengupload gambar baru atau menggunakan URI yang sudah ada
@@ -224,5 +225,37 @@ const testUpdateProduct = async () => {
   }
 };
 
+const getListProducts = async () => {
+  let allProducts = [];
+  let nextPageToken = "";
+  let hasMore = true;
+  let page = 1;
+  try {
+    const response = await searchProducts({
+      page_size: 100,
+      page_token: nextPageToken,
+    });
+
+    if (response?.data?.products) {
+      allProducts = allProducts.concat(response.data.products);
+    }
+
+    if (response?.data?.next_page_token) {
+      nextPageToken = response.data.next_page_token;
+      page++;
+    } else {
+      hasMore = false;
+    }
+  } catch (error) {
+    console.error(
+      `[Stock Sync] ❌ Gagal mengambil produk dari TikTok Shop pada halaman ${page}:`,
+      error
+    );
+    hasMore = false; // Hentikan jika terjadi error
+  }
+};
+
 // testUpdateProduct();
-refreshToken();
+// refreshToken();
+// getCategories();
+getListProducts();

@@ -94,7 +94,7 @@ const refreshToken = async () => {
  */
 const getValidAccessToken = async () => {
   const tokenRecord = await TiktokToken.findOne({
-    where: { shop_id: SHOP_CIPHER },
+    where: { shop_cipher: SHOP_CIPHER },
   });
 
   if (!tokenRecord) {
@@ -148,7 +148,7 @@ const generateSign = (url, params, body, contentType, appSecret) => {
 /**
  * Generic POST caller for TikTok API with signature generation
  */
-const postToTiktok = async (path, body = {}) => {
+const postToTiktok = async (path, body = {}, queryParams = {}) => {
   const accessToken = await getValidAccessToken();
   const timestamp = Math.floor(Date.now() / 1000);
   const fullUrl = `${API_URL}${path}`;
@@ -159,6 +159,7 @@ const postToTiktok = async (path, body = {}) => {
     app_key: APP_KEY,
     timestamp,
     shop_cipher: SHOP_CIPHER,
+    ...queryParams,
   };
 
   const sign = generateSign(fullUrl, params, body, contentType, APP_SECRET);
@@ -428,6 +429,28 @@ const getCategoryAttributes = async (categoryId, options = {}) => {
   return getFromTiktok(path, queryParams);
 };
 
+/**
+ * Searches for products on TikTok Shop with pagination.
+ * Uses the 202309 API version.
+ * @param {object} [searchParams={}] - The query parameters for the search request.
+ *   - `page_size` and `page_token` are sent as query parameters.
+ *   - Other properties like `status`, `listing_quality_tier` are sent in the request body.
+ * @returns {Promise<Object>} TikTok API response.
+ */
+const searchProducts = async (searchParams = {}) => {
+  const path = "/product/202309/products/search";
+
+  const { page_size = 100 } = searchParams;
+  const body = { status: "ACTIVATE" };
+
+  const queryParams = {
+    version: "202309",
+    page_size,
+  };
+
+  return postToTiktok(path, body, queryParams);
+};
+
 module.exports = {
   createProduct,
   uploadImage,
@@ -442,4 +465,5 @@ module.exports = {
   deactivateProduct,
   getSingleProductDetails,
   refreshToken,
+  searchProducts,
 };

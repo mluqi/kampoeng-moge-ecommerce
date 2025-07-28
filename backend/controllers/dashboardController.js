@@ -1,4 +1,4 @@
-const { Order, User, sequelize } = require("../models");
+const { Order, User, OrderItem, Product, sequelize } = require("../models");
 const { Op } = require("sequelize");
 
 exports.getStats = async (req, res) => {
@@ -15,7 +15,10 @@ exports.getStats = async (req, res) => {
     const dateWhereClause = {};
     if (startDate && endDate) {
       dateWhereClause.createdAt = {
-        [Op.between]: [new Date(startDate), new Date(new Date(endDate).setHours(23, 59, 59, 999))],
+        [Op.between]: [
+          new Date(startDate),
+          new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+        ],
       };
     }
 
@@ -54,12 +57,56 @@ exports.getStats = async (req, res) => {
       include: [{ model: User, attributes: ["user_name"] }],
     });
 
+    // 6. Produk terlaris 5 teratas
+    const bestSellingProducts = await OrderItem.findAll({
+      attributes: [
+        "product_id",
+        [sequelize.fn("SUM", sequelize.col("quantity")), "totalQuantity"],
+      ],
+      group: ["product_id"],
+      order: [[sequelize.col("totalQuantity"), "DESC"]],
+      limit: 5,
+      include: [
+        { model: Product, attributes: ["product_name"], as: "product" },
+      ],
+    });
+
+    //7. Favorite Metode Pmebayaran
+    const favoritePaymentMethods = await Order.findAll({
+      attributes: [
+        "payment_method",
+        [sequelize.fn("COUNT", sequelize.col("payment_method")), "count"],
+      ],
+      group: ["payment_method"],
+      order: [[sequelize.col("count"), "DESC"]],
+    });
+
+    //8. Total jenis product yang sudah terjual
+    const totalProductSold = await OrderItem.count({
+      distinct: true,
+      col: "product_id",
+      include: [
+        {
+          model: Order,
+          where: { status: "completed", ...dateWhereClause },
+          attributes: [],
+        },
+      ],
+    });
+
+    //9. total user
+    const totalUser = await User.count();
+
     res.status(200).json({
       totalRevenue: totalRevenue || 0,
       totalOrders: totalOrders || 0,
       newOrdersToday: newOrdersToday || 0,
       newUsersToday: newUsersToday || 0,
       recentOrders: recentOrders || [],
+      bestSellingProducts: bestSellingProducts || [],
+      favoritePaymentMethods: favoritePaymentMethods || [],
+      totalProductSold: totalProductSold || 0,
+      totalCustomers: totalUser || 0,
     });
   } catch (error) {
     console.error("Error fetching dashboard stats:", error);
@@ -75,7 +122,10 @@ exports.getSalesChartData = async (req, res) => {
     const dateFilter = {};
     if (startDate && endDate) {
       dateFilter.createdAt = {
-        [Op.between]: [new Date(startDate), new Date(new Date(endDate).setHours(23, 59, 59, 999))],
+        [Op.between]: [
+          new Date(startDate),
+          new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+        ],
       };
     } else {
       // Default 7 hari terakhir jika tidak ada rentang tanggal
@@ -96,7 +146,9 @@ exports.getSalesChartData = async (req, res) => {
     });
 
     // Buat array tanggal untuk rentang yang dipilih (atau default 7 hari)
-    const start = startDate ? new Date(startDate) : new Date(new Date().setDate(new Date().getDate() - 6));
+    const start = startDate
+      ? new Date(startDate)
+      : new Date(new Date().setDate(new Date().getDate() - 6));
     const end = endDate ? new Date(endDate) : new Date();
     const daysInRange = [];
     for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate() + 1)) {
@@ -106,7 +158,10 @@ exports.getSalesChartData = async (req, res) => {
     const chartData = daysInRange.map((day) => {
       const sale = salesData.find((s) => s.date === day);
       return {
-        name: new Date(day).toLocaleDateString("id-ID", { weekday: "short", day: "numeric" }),
+        name: new Date(day).toLocaleDateString("id-ID", {
+          weekday: "short",
+          day: "numeric",
+        }),
         Pendapatan: sale ? parseFloat(sale.totalSales) : 0,
       };
     });

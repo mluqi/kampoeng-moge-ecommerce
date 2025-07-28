@@ -167,6 +167,41 @@ exports.createProduct = async (req, res) => {
     return res.status(400).json({ message: "All fields are required" });
   }
 
+  // --- START: TikTok API Validation ---
+  if (name.length < 25 || name.length > 255) {
+    return res
+      .status(400)
+      .json({ message: "Judul produk harus antara 25 dan 255 karakter." });
+  }
+
+  // Validasi panjang deskripsi (mengabaikan tag HTML untuk penghitungan)
+  const plainTextDescription = description.replace(/<[^>]*>?/gm, "");
+  if (plainTextDescription.length < 60 || plainTextDescription.length > 10000) {
+    return res.status(400).json({
+      message: "Deskripsi produk harus antara 60 dan 10.000 karakter.",
+    });
+  }
+
+  try {
+    const parsedDimensions = JSON.parse(dimension);
+    const { length, width, height } = parsedDimensions;
+    const weightKg = parseFloat(weight);
+
+    if (length <= 0 || length > 60 || width <= 0 || width > 60 || height <= 0 || height > 60) {
+      return res.status(400).json({ message: "Setiap dimensi (panjang, lebar, tinggi) harus antara 0.01 dan 60 cm." });
+    }
+
+    if (weightKg > 0) {
+      const chargeableWeightRatio = (length * width * height) / 6000 / weightKg;
+      if (chargeableWeightRatio >= 1.1) {
+        return res.status(400).json({ message: `Rasio berat yang dapat ditagih terlalu tinggi (${chargeableWeightRatio.toFixed(2)}). Seharusnya kurang dari 1.1. Rumus: (P x L x T / 6000) / Berat.` });
+      }
+    }
+  } catch (e) {
+    return res.status(400).json({ message: "Format dimensi tidak valid." });
+  }
+  // --- END: TikTok API Validation ---
+
   let pictures = [];
   if (req.files && req.files.pictures && req.files.pictures.length > 0) {
     pictures = Array.isArray(req.files.pictures)
@@ -271,6 +306,12 @@ exports.createProduct = async (req, res) => {
         };
 
         const tiktokResponse = await createTiktokProduct(tiktokPayload);
+        if (!tiktokResponse?.data?.product_id) {
+          await product.destroy();
+          deleteFiles(pictures);
+          return res.status(500).json({ message: "Failed to create product" });
+        }
+        
         console.log(
           "✅ Product successfully created on TikTok Shop:",
           tiktokResponse?.data || tiktokResponse
@@ -338,6 +379,39 @@ exports.updateProduct = async (req, res) => {
     console.log("No new pictures uploaded");
     pictures = [];
   }
+
+  // --- START: TikTok API Validation ---
+  if (name && (name.length < 25 || name.length > 255)) {
+    return res
+      .status(400)
+      .json({ message: "Judul produk harus antara 25 dan 255 karakter." });
+  }
+
+  if (description && (description.replace(/<[^>]*>?/gm, "").length < 60 || description.length > 10000)) {
+    return res.status(400).json({
+      message: "Deskripsi produk harus antara 60 dan 10.000 karakter.",
+    });
+  }
+
+  try {
+    const parsedDimensions = JSON.parse(dimension);
+    const { length, width, height } = parsedDimensions;
+    const weightKg = parseFloat(weight);
+
+    if (length <= 0 || length > 60 || width <= 0 || width > 60 || height <= 0 || height > 60) {
+      return res.status(400).json({ message: "Setiap dimensi (panjang, lebar, tinggi) harus antara 0.01 dan 60 cm." });
+    }
+
+    if (weightKg > 0) {
+      const chargeableWeightRatio = (length * width * height) / 6000 / weightKg;
+      if (chargeableWeightRatio >= 1.1) {
+        return res.status(400).json({ message: `Rasio berat yang dapat ditagih terlalu tinggi (${chargeableWeightRatio.toFixed(2)}). Seharusnya kurang dari 1.1. Rumus: (P x L x T / 6000) / Berat.` });
+      }
+    }
+  } catch (e) {
+    return res.status(400).json({ message: "Format dimensi tidak valid." });
+  }
+  // --- END: TikTok API Validation ---
 
   try {
     // DYNAMIC IMPORT: Untuk memutus dependensi melingkar
@@ -668,20 +742,16 @@ exports.activateTiktokProduct = async (req, res) => {
     const { activateProduct } = require("../services/tiktokShop");
     const result = await activateProduct(product_ids);
 
-    res
-      .status(200)
-      .json({
-        message: "Produk berhasil diaktifkan di TikTok Shop.",
-        data: result,
-      });
+    res.status(200).json({
+      message: "Produk berhasil diaktifkan di TikTok Shop.",
+      data: result,
+    });
   } catch (error) {
     console.error("Error activating TikTok product:", error);
-    res
-      .status(500)
-      .json({
-        message: "Gagal mengaktifkan produk di TikTok Shop.",
-        details: error,
-      });
+    res.status(500).json({
+      message: "Gagal mengaktifkan produk di TikTok Shop.",
+      details: error,
+    });
   }
 };
 
@@ -699,20 +769,16 @@ exports.deactivateTiktokProduct = async (req, res) => {
     const { deactivateProduct } = require("../services/tiktokShop");
     const result = await deactivateProduct(product_ids);
 
-    res
-      .status(200)
-      .json({
-        message: "Produk berhasil dinonaktifkan di TikTok Shop.",
-        data: result,
-      });
+    res.status(200).json({
+      message: "Produk berhasil dinonaktifkan di TikTok Shop.",
+      data: result,
+    });
   } catch (error) {
     console.error("Error deactivating TikTok product:", error);
-    res
-      .status(500)
-      .json({
-        message: "Gagal menonaktifkan produk di TikTok Shop.",
-        details: error,
-      });
+    res.status(500).json({
+      message: "Gagal menonaktifkan produk di TikTok Shop.",
+      details: error,
+    });
   }
 };
 

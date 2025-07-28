@@ -23,7 +23,11 @@ const featuredProductRoutes = require("./routes/featuredProductRoutes");
 const headerSlideRoutes = require("./routes/headerSlideRoutes");
 const bannerRoutes = require("./routes/promoBannerRoutes");
 
-const { startScheduledJobs } = require("./cron/scheduler");
+// Cron job
+const {
+  startScheduledJobs,
+  checkAndRefreshTokenOnStart,
+} = require("./cron/scheduler");
 const tiktokRoutes = require("./routes/tiktokRoutes");
 
 const { Server } = require("socket.io");
@@ -98,10 +102,21 @@ app.use("/api/header-slides", headerSlideRoutes);
 app.use("/api/banners", bannerRoutes);
 app.use("/api/tiktok", tiktokRoutes);
 
-// Start all scheduled jobs
-startScheduledJobs();
-
 const PORT = process.env.PORT || 8000;
-server.listen(PORT, () => {
-  console.log(`server is running on port ${PORT}`);
-});
+
+const startServer = async () => {
+  try {
+    await checkAndRefreshTokenOnStart();
+
+    startScheduledJobs();
+
+    app.listen(PORT, () => {
+      console.log(`🚀 Server is running on PORT ${PORT}`);
+    });
+  } catch (error) {
+    console.error("❌ Failed to start the server:", error);
+    process.exit(1);
+  }
+};
+
+startServer();

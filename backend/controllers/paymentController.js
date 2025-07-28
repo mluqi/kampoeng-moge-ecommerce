@@ -55,7 +55,7 @@ exports.handleXenditWebhook = async (req, res) => {
           parseFloat(order.total_amount) === paidAmount
         ) {
           order.status = "processing";
-          order.payment_method = data.payment_method;
+          // order.payment_method = data.payment_method;
           await order.save({ transaction: t });
           console.log(`Order ${orderId} status updated to processing.`);
 
