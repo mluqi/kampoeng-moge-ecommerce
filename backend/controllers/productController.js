@@ -4,6 +4,33 @@ const { Op } = require("sequelize");
 const fs = require("fs");
 const path = require("path");
 
+// Helper function to safely parse JSON fields from a product object
+const parseProductJSONFields = (productInstance) => {
+  // Use .get({ plain: true }) to get a clean data object
+  const product = productInstance.get({ plain: true });
+
+  const fieldsToParse = [
+    { key: "product_pictures", default: [] },
+    { key: "product_dimensions", default: {} },
+    { key: "product_attributes_tiktok", default: [] },
+  ];
+
+  for (const field of fieldsToParse) {
+    const value = product[field.key];
+    if (value && typeof value === "string") {
+      try {
+        product[field.key] = JSON.parse(value);
+      } catch (e) {
+        console.error(`Error parsing ${field.key} for product ${product.product_id}:`, e.message);
+        product[field.key] = field.default; // Fallback to default on parsing error
+      }
+    } else if (!value) {
+      product[field.key] = field.default; // Fallback to default if null/undefined
+    }
+  }
+  return product;
+};
+
 function deleteFiles(files) {
   if (!files) return;
   files.forEach((file) => {
@@ -78,7 +105,7 @@ exports.getAllProducts = async (req, res) => {
     });
 
     res.status(200).json({
-      data: rows,
+      data: rows.map(parseProductJSONFields), // Parse JSON fields before sending
       totalPages: Math.ceil(count / limitNum),
       currentPage: pageNum,
       totalProducts: count,
@@ -105,6 +132,9 @@ exports.getProductById = async (req, res) => {
     });
     if (!product) return res.status(404).json({ message: "Product not found" });
 
+    // Parse the JSON fields before further processing and sending the response
+    const parsedProduct = parseProductJSONFields(product);
+
     // --- START TIKTOK STATUS INTEGRATION ---
     if (product.product_tiktok_id) {
       try {
@@ -114,7 +144,7 @@ exports.getProductById = async (req, res) => {
         );
 
         if (tiktokResponse?.data?.status) {
-          product.dataValues.tiktok_status = tiktokResponse.data.status;
+          parsedProduct.tiktok_status = tiktokResponse.data.status;
         }
       } catch (tiktokError) {
         console.error(
@@ -124,7 +154,7 @@ exports.getProductById = async (req, res) => {
       }
     }
 
-    res.status(200).json(product);
+    res.status(200).json(parsedProduct);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -239,7 +269,7 @@ exports.createProduct = async (req, res) => {
       product_keyword_search: categoryKeyword,
       product_weight: weight,
       product_dimensions: dimension,
-      product_pictures: pictures,
+      product_pictures: JSON.stringify(pictures), // Stringify the pictures array
       product_annotations: annotations,
       product_brand: brand,
     });
@@ -427,12 +457,22 @@ exports.updateProduct = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    const oldPictures = product.product_pictures || [];
+    let oldPictures = [];
+    if (product.product_pictures && typeof product.product_pictures === "string") {
+      try {
+        const parsed = JSON.parse(product.product_pictures);
+        // Pastikan hasil parse adalah array
+        if (Array.isArray(parsed)) {
+          oldPictures = parsed;
+        }
+      } catch (e) {
+        console.error(`Gagal mem-parsing product_pictures lama untuk produk ${req.params.id}:`, e);
+      }
+    }
     // Gabungkan gambar yang ada (yang tidak dihapus) dengan gambar baru.
     // Gunakan Set untuk secara otomatis menangani duplikasi.
     const finalPictures = [...new Set([...existingPictures, ...pictures])];
 
-    // Tentukan file mana yang akan dihapus dari server
     const picturesToDelete = oldPictures.filter(
       (oldPic) => !finalPictures.includes(oldPic)
     );
@@ -452,7 +492,7 @@ exports.updateProduct = async (req, res) => {
       product_keyword_search: categoryKeyword,
       product_weight: weight,
       product_dimensions: dimension,
-      product_pictures: finalPictures,
+      product_pictures: JSON.stringify(finalPictures), // Stringify the pictures array
       product_annotations: annotations,
       product_brand: brand,
     });
@@ -645,8 +685,16 @@ exports.deleteProduct = async (req, res) => {
     const product = await Product.findByPk(req.params.id);
     if (!product) return res.status(404).json({ message: "Product not found" });
 
-    if (product.product_pictures && product.product_pictures.length > 0) {
-      deleteFiles(product.product_pictures);
+    // Parse product_pictures from string to array before deleting files
+    if (product.product_pictures) {
+      try {
+        const picturesArray = JSON.parse(product.product_pictures);
+        if (picturesArray && picturesArray.length > 0) {
+          deleteFiles(picturesArray);
+        }
+      } catch (e) {
+        console.error(`Could not parse product_pictures for product ${req.params.id} on delete`, e);
+      }
     }
     await product.destroy();
     res.status(200).json({ message: "Product deleted" });
@@ -720,7 +768,7 @@ exports.getProductsByCategory = async (req, res) => {
       include: [{ model: Category, as: "category" }],
     });
 
-    res.status(200).json(products);
+    res.status(200).json(products.map(parseProductJSONFields)); // Parse JSON fields
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

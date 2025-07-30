@@ -22,6 +22,8 @@ const contentRoutes = require("./routes/contentRoutes");
 const featuredProductRoutes = require("./routes/featuredProductRoutes");
 const headerSlideRoutes = require("./routes/headerSlideRoutes");
 const bannerRoutes = require("./routes/promoBannerRoutes");
+const loginBannerRoutes = require("./routes/loginBannerRoutes");
+
 
 // Cron job
 const {
@@ -67,7 +69,8 @@ app.use((req, res, next) => {
 
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: "http://192.168.10.33:3000",
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
@@ -100,6 +103,7 @@ app.use("/api/content", contentRoutes);
 app.use("/api/featured-products", featuredProductRoutes);
 app.use("/api/header-slides", headerSlideRoutes);
 app.use("/api/banners", bannerRoutes);
+app.use("/api/login-banners", loginBannerRoutes);
 app.use("/api/tiktok", tiktokRoutes);
 
 const PORT = process.env.PORT || 8000;
@@ -110,7 +114,7 @@ const startServer = async () => {
 
     startScheduledJobs();
 
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       console.log(`🚀 Server is running on PORT ${PORT}`);
     });
   } catch (error) {
