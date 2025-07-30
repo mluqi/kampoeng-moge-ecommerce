@@ -5,9 +5,10 @@ import { useAppContext } from "@/contexts/AppContext";
 import Image from "next/image";
 import { assets } from "@/assets/assets";
 import { FcGoogle } from "react-icons/fc";
-import { signIn } from "next-auth/react"; // Import signIn dari NextAuth.js
+import { signIn } from "next-auth/react"; 
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserAuth } from "@/contexts/UserAuthContext";
+import api from "@/service/api";
 import Loading from "@/components/Loading";
 
 const Account = () => {
@@ -19,12 +20,29 @@ const Account = () => {
     password: "",
   });
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-
-  const sliderImages = [
+  const [sliderImages, setSliderImages] = useState([
     assets.login_banner_1,
     assets.login_banner_2,
     assets.login_banner_3,
-  ];
+  ]);
+
+  useEffect(() => {
+    const fetchLoginBanners = async () => {
+      try {
+        const response = await api.get("/login-banners");
+        if (response.data && response.data.length > 0) {
+          const dynamicImages = response.data.map(
+            (banner) => `${process.env.NEXT_PUBLIC_BACKEND_URL}${banner.images}`
+          );
+          setSliderImages(dynamicImages);
+        }
+        // console.log(response.data)
+      } catch (error) {
+        console.error("Failed to fetch login banners, using static images.", error);
+      }
+    };
+    fetchLoginBanners();
+  }, []);
 
   const { loginAdmin } = useAuth();
   const { user, loading: userLoading } = useUserAuth();
@@ -86,6 +104,9 @@ const Account = () => {
               className="mx-auto h-12 w-auto cursor-pointer"
               src={assets.logo_accent}
               alt="Logo"
+              width={100}
+              height={100}
+              priority
               onClick={() => router.push("/")}
             />
             <h2 className="mt-6 text-center text-3xl font-bold text-gray-700">
@@ -199,17 +220,18 @@ const Account = () => {
       </div>
       {/* Right Column: Image Slider */}
       <div className="hidden md:block w-1/2 relative">
-        {sliderImages.map((src, index) => (
+        {sliderImages.map((imageSrc, index) => (
           <Image
             key={index}
-            src={src}
+            src={imageSrc}
             alt={`Kampoeng Moge gallery image ${index + 1}`}
-            layout="fill"
-            objectFit="cover"
+            fill
+            style={{ objectFit: "cover" }}
+            sizes="50vw"
+            priority
             className={`transition-opacity duration-1000 ease-in-out absolute inset-0 ${
               index === currentImageIndex ? "opacity-100" : "opacity-0"
             }`}
-            priority={index === 0} // Prioritize loading the first image
           />
         ))}
       </div>
