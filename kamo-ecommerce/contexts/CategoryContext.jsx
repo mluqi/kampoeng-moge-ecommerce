@@ -21,12 +21,30 @@ export const CategoryProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  const fetchCategoryById = async (id) => {
+    // setLoading(true); // sengaja dihilangkan agar tidak menyebabkan loading di seluruh halaman
+    setError("");
+    try {
+      const res = await api.get(`/products/categories/${id}`);
+      return res.data;
+    } catch (err) {
+      setError(
+        err?.response?.data?.message || "Gagal mengambil detail kategori",
+      );
+      return null;
+    }
+  };
+
   // Add category
   const addCategory = async (data) => {
     setLoading(true);
     setError("");
     try {
-      await api.post("/products/categories", data);
+      await api.post("/products/categories", data, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
       await fetchCategories();
       return true;
     } catch (err) {
@@ -42,7 +60,11 @@ export const CategoryProvider = ({ children }) => {
     setLoading(true);
     setError("");
     try {
-      await api.put(`/products/categories/${id}`, data);
+      await api.put(`/products/categories/${id}`, data, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
       await fetchCategories();
       return true;
     } catch (err) {
@@ -76,6 +98,7 @@ export const CategoryProvider = ({ children }) => {
         loading,
         error,
         fetchCategories,
+        fetchCategoryById,
         addCategory,
         updateCategory,
         deleteCategory,

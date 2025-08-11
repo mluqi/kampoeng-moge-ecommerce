@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { FaPaperPlane, FaUser, FaArrowLeft } from "react-icons/fa";
 import Loading from "../Loading";
 
@@ -13,16 +13,38 @@ const ChatWindow = ({
 }) => {
   const [newMessage, setNewMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
   };
 
+  // Gunakan useLayoutEffect untuk memastikan scroll terjadi setelah DOM di-update
+  // tapi sebelum browser melakukan paint. Ini mencegah "lompatan" visual.
+  useLayoutEffect(() => {
+    if (isAtBottom) {
+      scrollToBottom();
+    }
+    // eslint-disable-next-line
+  }, [messages]);
+
+  // Deteksi apakah user sedang di bawah
+  const handleScroll = () => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const threshold = 80; // px, toleransi agar tidak terlalu strict
+    setIsAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < threshold);
+  };
+
+  // Reset scroll ke bawah saat ganti percakapan
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+    setIsAtBottom(true);
+    // eslint-disable-next-line
+  }, [selectedConversation]);
 
   useEffect(() => {
     if (messages && inputRef.current) {
@@ -118,25 +140,26 @@ const ChatWindow = ({
     );
   }
 
-if (!messages) {
-  return (
-    <div className="flex-1 flex items-center justify-center min-h-[calc(100vh-100px)] bg-gray-50">
-      <div className="text-center p-6 max-w-md mx-auto">
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-          <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <FaUser className="text-2xl text-gray-400" />
+  if (!messages) {
+    return (
+      <div className="flex-1 flex items-center justify-center  bg-gray-50">
+        <div className="text-center p-6 max-w-md mx-auto">
+          <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+            <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <FaUser className="text-2xl text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-800 mb-2">
+              Pilih percakapan untuk memulai chat
+            </h3>
+            <p className="text-gray-500 text-sm">
+              Klik pada salah satu percakapan di sebelah kiri untuk melihat
+              pesan
+            </p>
           </div>
-          <h3 className="text-lg font-medium text-gray-800 mb-2">
-            Pilih percakapan untuk memulai chat
-          </h3>
-          <p className="text-gray-500 text-sm">
-            Klik pada salah satu percakapan di sebelah kiri untuk melihat pesan
-          </p>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   const messageGroups = groupMessagesByDate(messages);
 
@@ -170,7 +193,11 @@ if (!messages) {
       )}
 
       {/* Messages */}
-      <div className="flex-1 p-4 overflow-y-auto">
+      <div
+        className="flex-1 p-4 overflow-y-auto"
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+      >
         {messageGroups.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-500">

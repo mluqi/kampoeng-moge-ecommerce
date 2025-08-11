@@ -1,4 +1,5 @@
 "use client";
+
 import { assets } from "@/assets/assets";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -56,6 +57,9 @@ const AddAddress = () => {
       pincode: "",
       area: "",
     }));
+    setCities([]);
+    setDistricts([]);
+    setSubdistricts([]);
     setAddressLocked(false);
     setZipCodeSearch("");
   };
@@ -109,7 +113,13 @@ const AddAddress = () => {
       const res = await api.get(
         `/destinations/location?zipCode=${zipCodeSearch}`
       );
-      const { province, city, district, subdistrict, zipCode } = res.data;
+      const { province, city, district, subdistrict, zipCode, country } =
+        res.data;
+
+      // Populate dropdowns so the values are displayed correctly
+      setCities([city]);
+      setDistricts([district]);
+      setSubdistricts([subdistrict]);
 
       setAddress((prev) => ({
         ...prev,
@@ -118,6 +128,7 @@ const AddAddress = () => {
         district: district,
         subdistrict: subdistrict,
         pincode: zipCode,
+        country: country || prev.country,
       }));
       setAddressLocked(true);
     } catch (err) {

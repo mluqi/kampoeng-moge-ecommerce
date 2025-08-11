@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUserAuth } from "@/contexts/UserAuthContext";
 import api from "@/service/api";
@@ -10,6 +10,12 @@ import { FaPencilAlt, FaTrash, FaCheckCircle } from "react-icons/fa";
 const AddressTab = () => {
   const router = useRouter();
   const { profile, userProfile } = useUserAuth();
+
+  useEffect(() => {
+    // Memuat ulang data profil untuk memastikan daftar alamat selalu terbaru
+    // saat komponen ini ditampilkan.
+    userProfile();
+  }, []);
 
   const handleDelete = async (addressId) => {
     if (window.confirm("Apakah Anda yakin ingin menghapus alamat ini?")) {
@@ -26,7 +32,9 @@ const AddressTab = () => {
 
   const setDefault = async (addressId) => {
     try {
-      await api.patch(`/auth/address/${addressId}/default`, { addressId });
+      await api.patch(`/auth/address/${addressId}/default`, {
+        addressId,
+      });
       toast.success("Alamat utama berhasil diatur.");
       userProfile();
     } catch (error) {

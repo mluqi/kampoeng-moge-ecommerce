@@ -9,12 +9,26 @@ import { useParams, useRouter } from "next/navigation";
 import Loading from "@/components/Loading";
 import { useProduct } from "@/contexts/ProductContext";
 import { useUserAuth } from "@/contexts/UserAuthContext";
+import { useChat } from "@/contexts/ChatContext";
 import { useCart } from "@/contexts/CartContext";
-import { FaHeart, FaShoppingCart, FaArrowRight } from "react-icons/fa";
+import {
+  FaHeart,
+  FaShoppingCart,
+  FaArrowRight,
+  FaCommentDots,
+} from "react-icons/fa";
 import StarRating from "@/components/StarRating";
 import api from "@/service/api";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { toast } from "react-hot-toast";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { FreeMode, Navigation, Thumbs } from "swiper/modules";
+
+// Import Swiper styles
+import "swiper/css";
+import "swiper/css/free-mode";
+import "swiper/css/navigation";
+import "swiper/css/thumbs";
 
 const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -24,14 +38,44 @@ const Product = () => {
   const { fetchProductById } = useProduct();
   const { addToCart } = useCart();
   const { user, wishlist, addToWishlist, removeFromWishlist } = useUserAuth();
+  const { startChatWithProduct } = useChat();
 
-  const [mainImage, setMainImage] = useState(null);
   const [productData, setProductData] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [loadingRelated, setLoadingRelated] = useState(true);
   const [reviews, setReviews] = useState([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [thumbsSwiper, setThumbsSwiper] = useState(null);
+
+  // --- LOGIKA PENCATATAN VIEW ---
+  useEffect(() => {
+    // Pastikan ID produk ada sebelum melakukan apa pun
+    if (!id) return;
+
+    // Kunci unik untuk sessionStorage agar tidak bentrok
+    const viewedKey = `viewed_product_${id}`;
+    const hasViewedInSession = sessionStorage.getItem(viewedKey);
+
+    // Hanya catat view jika belum pernah dilihat di sesi browser ini.
+    // Ini juga mencegah duplikasi panggilan karena React.StrictMode di mode development.
+    if (!hasViewedInSession) {
+      // Tandai SEGERA secara sinkron untuk mencegah panggilan ganda dari StrictMode.
+      sessionStorage.setItem(viewedKey, "true");
+
+      const recordView = async () => {
+        try {
+          // Panggil endpoint backend yang sudah kita buat
+          await api.post(`/products/${id}/view`);
+        } catch (error) {
+          // Gagal mencatat view tidak boleh mengganggu user, cukup log di console.
+          console.error("Gagal mencatat tampilan produk:", error);
+          // Opsional: Hapus kunci jika API gagal, agar bisa dicoba lagi saat refresh.
+          // sessionStorage.removeItem(viewedKey);
+        }
+      };
+      recordView();
+    }
+  }, [id]); // <-- Dependensi: jalankan efek ini hanya saat `id` produk berubah
 
   // Fetch main product data
   useEffect(() => {
@@ -43,7 +87,6 @@ const Product = () => {
         const product = await fetchProductById(id);
         if (isMounted && product) {
           setProductData(product);
-          setMainImage(product.product_pictures?.[0] || null);
         }
       } catch (error) {
         toast.error("Gagal memuat produk");
@@ -110,10 +153,8 @@ const Product = () => {
     }
     if (isWishlisted) {
       removeFromWishlist(productData.product_id);
-      // toast.success("Produk dihapus dari wishlist");
     } else {
       addToWishlist(productData.product_id);
-      // toast.success("Produk ditambahkan ke wishlist");
     }
   };
 
@@ -130,7 +171,6 @@ const Product = () => {
       return;
     }
     addToCart(productData.product_id);
-    toast.success("Produk ditambahkan ke keranjang");
   };
 
   const handleBuyNow = () => {
@@ -145,28 +185,29 @@ const Product = () => {
       });
       return;
     }
-    // if (isOutOfStock) {
-    //   toast.error("Produk ini sedang habis stok");
-    //   return;
-    // }
     addToCart(productData.product_id);
     router.push("/cart");
   };
 
-  const navigateImage = (direction) => {
-    if (!productData?.product_pictures) return;
-
-    const totalImages = productData.product_pictures.length;
-    let newIndex;
-
-    if (direction === "next") {
-      newIndex = (currentImageIndex + 1) % totalImages;
-    } else {
-      newIndex = (currentImageIndex - 1 + totalImages) % totalImages;
+  const handleAskAdmin = () => {
+    if (!user) {
+      toast.error("Silakan login untuk memulai chat.", {
+        icon: "🔒",
+        position: "top-center",
+      });
+      return;
     }
 
-    setCurrentImageIndex(newIndex);
-    setMainImage(productData.product_pictures[newIndex]);
+    // Buat objek produk yang ringkas untuk dikirim
+    const productInfo = {
+      id: productData.product_id,
+      name: productData.product_name,
+      price: productData.product_price,
+      image: productData.product_pictures?.[0]
+        ? baseUrl + productData.product_pictures[0]
+        : assets.product_placeholder.src, // Pastikan placeholder punya .src
+    };
+    startChatWithProduct(productInfo);
   };
 
   if (!productData) {
@@ -193,49 +234,68 @@ const Product = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           {/* Product Images */}
           <div className="relative">
-            <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden mb-4">
-              <Image
-                src={
-                  mainImage ? baseUrl + mainImage : assets.product_placeholder
-                }
-                alt={productData.product_name}
-                className="object-contain w-full h-full"
-                width={800}
-                height={800}
-                priority
-              />
-
-              {productData.product_pictures?.length > 1 && (
-                <>
-                  <button
-                    onClick={() => navigateImage("prev")}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 p-2 rounded-full shadow-md hover:bg-white"
-                  >
-                    <FiChevronLeft className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => navigateImage("next")}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 p-2 rounded-full shadow-md hover:bg-white"
-                  >
-                    <FiChevronRight className="w-5 h-5" />
-                  </button>
-                </>
+            <Swiper
+              modules={[FreeMode, Navigation, Thumbs]}
+              spaceBetween={10}
+              loop={true}
+              navigation={{
+                nextEl: ".swiper-button-next-custom",
+                prevEl: ".swiper-button-prev-custom",
+              }}
+              thumbs={{
+                swiper:
+                  thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null,
+              }}
+              className="aspect-square bg-gray-50 rounded-xl overflow-hidden mb-4"
+            >
+              {productData.product_pictures?.length > 0 ? (
+                productData.product_pictures.map((image, index) => (
+                  <SwiperSlide key={index}>
+                    <Image
+                      src={baseUrl + image}
+                      alt={`Produk ${productData.product_name} ${index + 1}`}
+                      className="object-contain w-full h-full"
+                      width={800}
+                      height={800}
+                      priority={index === 0}
+                    />
+                  </SwiperSlide>
+                ))
+              ) : (
+                <SwiperSlide>
+                  <Image
+                    src={assets.product_placeholder}
+                    alt={productData.product_name}
+                    className="object-contain w-full h-full"
+                    width={800}
+                    height={800}
+                    priority
+                  />
+                </SwiperSlide>
               )}
-            </div>
+              {/* Custom Navigation Buttons */}
+              <button className="swiper-button-prev-custom absolute top-1/2 -translate-y-1/2 left-4 z-10 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition disabled:opacity-0">
+                <FiChevronLeft className="w-5 h-5 text-gray-700" />
+              </button>
+              <button className="swiper-button-next-custom absolute top-1/2 -translate-y-1/2 right-4 z-10 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition disabled:opacity-0">
+                <FiChevronRight className="w-5 h-5 text-gray-700" />
+              </button>
+            </Swiper>
 
-            <div className="grid grid-cols-4 gap-3">
+            <Swiper
+              onSwiper={setThumbsSwiper}
+              spaceBetween={10}
+              slidesPerView={4}
+              freeMode={true}
+              loop={true}
+              watchSlidesProgress={true}
+              modules={[FreeMode, Navigation, Thumbs]}
+              className="h-24"
+            >
               {productData.product_pictures?.map((image, index) => (
-                <button
+                <SwiperSlide
                   key={index}
-                  onClick={() => {
-                    setMainImage(image);
-                    setCurrentImageIndex(index);
-                  }}
-                  className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                    mainImage === image
-                      ? "border-accent ring-2 ring-accent/30"
-                      : "border-transparent hover:border-gray-200"
-                  }`}
+                  className="cursor-pointer rounded-lg overflow-hidden border-2 border-transparent hover:border-accent [&.swiper-slide-thumb-active]:border-black"
                 >
                   <Image
                     src={baseUrl + image}
@@ -244,9 +304,9 @@ const Product = () => {
                     width={200}
                     height={200}
                   />
-                </button>
+                </SwiperSlide>
               ))}
-            </div>
+            </Swiper>
           </div>
 
           {/* Product Info */}
@@ -333,18 +393,30 @@ const Product = () => {
             </div>
 
             <div className="mt-auto space-y-3">
-              <button
-                onClick={handleAddToCart}
-                disabled={isOutOfStock}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-accent hover:bg-accent/90 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <FaShoppingCart />
-                Tambah ke Keranjang
-              </button>
+              <div className="grid grid-cols-5 gap-4">
+                {/* Tanya Admin: col-span 1 */}
+                <button
+                  onClick={handleAskAdmin}
+                  className="p-3 bg-accent hover:bg-accent/90 text-white rounded-lg transition flex items-center justify-center"
+                >
+                  <FaCommentDots className="text-lg" />
+                </button>
+
+                {/* Tambah ke Keranjang: col-span 3 */}
+                <button
+                  onClick={handleAddToCart}
+                  disabled={isOutOfStock}
+                  className="col-span-4 flex items-center justify-center gap-2 py-3 border-2 border-accent text-accent hover:bg-accent/10 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FaShoppingCart />
+                  Tambah ke Keranjang
+                </button>
+              </div>
+
               <button
                 onClick={handleBuyNow}
                 disabled={isOutOfStock}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2 py-3 bg-accent hover:bg-accent/90 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Beli Sekarang
                 <FaArrowRight />

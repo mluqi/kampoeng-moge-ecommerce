@@ -1,0 +1,15 @@
+# *
+User-agent: *
+Allow: /
+
+# *
+User-agent: *
+Disallow: /profile
+Disallow: /add-address
+Disallow: /cart
+
+# Host
+Host: https://www.kampoengmoge.com
+
+# Sitemaps
+Sitemap: https://www.kampoengmoge.com/sitemap.xml

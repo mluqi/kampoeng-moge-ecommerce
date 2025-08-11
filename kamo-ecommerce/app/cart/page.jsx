@@ -206,7 +206,7 @@ const Cart = () => {
             </div>
 
             {/* Order Summary - Desktop */}
-            <div className="hidden lg:block lg:col-span-1">
+            <div className="hidden lg:block lg:col-span-1 ">
               <div className="bg-gray-50 p-6 rounded-lg sticky top-28">
                 <h2 className="text-xl font-medium text-gray-800 mb-6">
                   Ringkasan Pesanan
@@ -266,7 +266,7 @@ const Cart = () => {
 
       {/* Floating Footer - Mobile */}
       {cartItems && cartItems.length > 0 && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white p-4 border-t shadow-[0_-2px_10px_rgba(0,0,0,0.1)]">
+        <div className="lg:hidden fixed bottom-16 left-0 right-0 bg-white p-4 border-t shadow-[0_-2px_10px_rgba(0,0,0,0.1)]">
           <div className="flex justify-between items-center mb-3">
             <span className="text-gray-600 text-sm">
               Subtotal ({selectedItems.length} item)

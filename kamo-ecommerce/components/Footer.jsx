@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { assets } from "@/assets/assets";
 import Image from "next/image";
 import api from "@/service/api";
-import { FaInstagram, FaFacebook } from "react-icons/fa";
+import { FaInstagram, FaFacebook, FaTiktok, FaYoutube } from "react-icons/fa";
 
 const Footer = () => {
   const [settings, setSettings] = useState(null);
@@ -28,8 +28,7 @@ const Footer = () => {
         <div className="w-4/5">
           <Image className="w-28 md:w-32" src={assets.logo_accent} alt="logo" />
           <p className="mt-6 text-sm">
-            {settings?.footer?.description ||
-              "Memuat deskripsi..."}
+            {settings?.footer?.description || "Memuat deskripsi..."}
           </p>
         </div>
 
@@ -94,15 +93,33 @@ const Footer = () => {
                 href={settings?.footer?.instagram_url || "#"}
                 target="_blank"
                 rel="noopener noreferrer"
-              >
+                className="hover:text-accent transition"
+                >
                 <FaInstagram />
               </a>
               <a
                 href={settings?.footer?.facebook_url || "#"}
                 target="_blank"
                 rel="noopener noreferrer"
-              >
+                className="hover:text-accent transition"
+                >
                 <FaFacebook />
+              </a>
+              <a
+                href={settings?.footer?.tiktok_url || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-accent transition"
+                >
+                <FaTiktok />
+              </a>
+              <a
+                href={settings?.footer?.youtube_url || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-accent transition"
+              >
+                <FaYoutube />
               </a>
             </div>
           </div>

@@ -6,7 +6,7 @@ import axios from "axios";
 // Membuat instance Axios khusus untuk komunikasi server-to-server.
 // Ini tidak menggunakan interceptor localStorage dari api.ts karena kode ini berjalan di server.
 const backendApi = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BACKEND_URL}/api`, // Tambahkan /api di sini
+  baseURL: `${process.env.NEXT_PUBLIC_BACKEND_URL}/kamo`, // Tambahkan /api di sini
 });
 const handler = NextAuth({
   providers: [

@@ -21,6 +21,8 @@ const AdminSettingsPage = () => {
           footer_email: res.data.footer?.email || "",
           footer_instagram_url: res.data.footer?.instagram_url || "",
           footer_facebook_url: res.data.footer?.facebook_url || "",
+          footer_tiktok_url: res.data.footer?.tiktok_url || "",
+          footer_youtube_url: res.data.footer?.youtube_url || "",
         });
       } catch (error) {
         toast.error("Gagal memuat pengaturan.");
@@ -57,6 +59,16 @@ const AdminSettingsPage = () => {
       {
         key: "facebook_url",
         value: settings.footer_facebook_url,
+        group: "footer",
+      },
+      {
+        key: "tiktok_url",
+        value: settings.footer_tiktok_url,
+        group: "footer",
+      },
+      {
+        key: "youtube_url",
+        value: settings.footer_youtube_url,
         group: "footer",
       },
     ];
@@ -152,6 +164,18 @@ const AdminSettingsPage = () => {
             "footer_facebook_url",
             "URL Facebook",
             "https://facebook.com/...",
+            "url"
+          )}
+          {renderInput(
+            "footer_tiktok_url",
+            "URL TikTok",
+            "https://tiktok.com/...",
+            "url"
+          )}
+          {renderInput(
+            "footer_youtube_url",
+            "URL YouTube",
+            "https://youtube.com/...",
             "url"
           )}
         </div>

@@ -16,6 +16,7 @@ import {
   FaEdit,
   FaStar,
   FaImages,
+  FaChartLine
 } from "react-icons/fa";
 import { BiSolidBookContent } from "react-icons/bi";
 
@@ -29,6 +30,14 @@ const SideBar = () => {
       items: [{ name: "Dashboard", path: "/admin", icon: <FaTachometerAlt /> }],
     },
     {
+      title: "Customer",
+      items: [
+        { name: "Orders", path: "/admin/orders", icon: <FaShoppingCart /> },
+        { name: "Chat", path: "/admin/chat", icon: <FaEnvelope /> },
+        { name: "Reviews", path: "/admin/reviews", icon: <FaComment /> },
+      ],
+    },
+    {
       title: "Products",
       items: [
         {
@@ -40,6 +49,11 @@ const SideBar = () => {
           name: "Product List",
           path: "/admin/product-list",
           icon: <FaListAlt />,
+        },
+        {
+          name: "Analytics",
+          path: "/admin/analytics",
+          icon: <FaChartLine />,
         },
         { name: "Category", path: "/admin/category", icon: <FaBookmark /> },
         {
@@ -69,14 +83,7 @@ const SideBar = () => {
         },
       ],
     },
-    {
-      title: "Customer",
-      items: [
-        { name: "Orders", path: "/admin/orders", icon: <FaShoppingCart /> },
-        { name: "Chat", path: "/admin/chat", icon: <FaEnvelope /> },
-        { name: "Reviews", path: "/admin/reviews", icon: <FaComment /> },
-      ],
-    },
+
     {
       title: "Settings",
       items: [{ name: "Settings", path: "/admin/settings", icon: <FaCog /> }],

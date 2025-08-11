@@ -34,7 +34,10 @@ export const AuthProvider = ({ children }) => {
 
   const loginAdmin = async ({ email, password }) => {
     try {
-      const res = await api.post("/auth/admin/signin", { email, password });
+      const res = await api.post("/auth/admin/signin", {
+        email,
+        password,
+      });
       if (res.data.token) {
         localStorage.setItem("token", res.data.token);
         await fetchAdminProfile(); // Fetch profile after getting token

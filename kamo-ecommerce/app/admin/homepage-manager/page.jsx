@@ -16,13 +16,7 @@ const HomepageManagerPage = () => {
   const [slides, setSlides] = useState([]);
   const [isSlideModalOpen, setIsSlideModalOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(null);
-  const [slideImagePreview, setSlideImagePreview] = useState(null);
-
-  // State for Promo Banners
-  const [banners, setBanners] = useState([]);
-  const [isBannerModalOpen, setIsBannerModalOpen] = useState(false);
-  const [currentBanner, setCurrentBanner] = useState(null);
-  const [bannerImagePreviews, setBannerImagePreviews] = useState({});
+  const [slideImagePreviews, setSlideImagePreviews] = useState({});
 
   //state for loginBanner
   const [loginBanners, setLoginBanners] = useState([]);
@@ -43,15 +37,6 @@ const HomepageManagerPage = () => {
     }
   }, []);
 
-  const fetchBanners = useCallback(async () => {
-    try {
-      const res = await api.get("/banners/all");
-      setBanners(res.data);
-    } catch (error) {
-      toast.error("Gagal memuat data banner.");
-    }
-  }, []);
-
   const fetchLoginBanners = useCallback(async () => {
     try {
       const res = await api.get("/login-banners/all");
@@ -65,27 +50,20 @@ const HomepageManagerPage = () => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchSlides(), fetchBanners(), fetchLoginBanners()]);
+      await Promise.all([fetchSlides(), fetchLoginBanners()]);
       setLoading(false);
     };
     loadData();
-  }, [fetchSlides, fetchBanners, fetchLoginBanners]);
+  }, [fetchSlides, fetchLoginBanners]);
 
   // --- Modal Handlers ---
   const handleOpenSlideModal = (slide = null) => {
     setCurrentSlide(slide);
-    setSlideImagePreview(slide ? baseUrl + slide.image_url : null);
-    setIsSlideModalOpen(true);
-  };
-
-  const handleOpenBannerModal = (banner = null) => {
-    setCurrentBanner(banner);
-    setBannerImagePreviews({
-      image_left: banner ? baseUrl + banner.image_left_url : null,
-      image_right: banner ? baseUrl + banner.image_right_url : null,
-      image_mobile: banner ? baseUrl + banner.image_mobile_url : null,
+    setSlideImagePreviews({
+      desktop: slide ? baseUrl + slide.image_url_desktop : null,
+      mobile: slide ? baseUrl + slide.image_url_mobile : null,
     });
-    setIsBannerModalOpen(true);
+    setIsSlideModalOpen(true);
   };
 
   const handleOpenLoginBannerModal = (loginBanner = null) => {
@@ -98,14 +76,11 @@ const HomepageManagerPage = () => {
 
   const handleCloseModals = () => {
     setIsSlideModalOpen(false);
-    setIsBannerModalOpen(false);
     setIsLoginBannerModalOpen(false);
     setCurrentSlide(null);
-    setCurrentBanner(null);
     setCurrentLoginBanner(null);
-    setSlideImagePreview(null);
+    setSlideImagePreviews({});
     setLoginBannerImagePreview(null);
-    setBannerImagePreviews({});
   };
 
   // --- Form Submit Handlers ---
@@ -113,6 +88,7 @@ const HomepageManagerPage = () => {
     e.preventDefault();
     setIsSubmitting(true);
     const formData = new FormData(e.target);
+    // Pastikan backend controller Anda diupdate untuk menangani field `link`, `image_desktop`, dan `image_mobile`
     const apiCall = currentSlide
       ? api.put(`/header-slides/${currentSlide.id}`, formData)
       : api.post("/header-slides", formData);
@@ -122,27 +98,6 @@ const HomepageManagerPage = () => {
         loading: "Menyimpan slide...",
         success: (res) => {
           fetchSlides();
-          handleCloseModals();
-          return res.data.message;
-        },
-        error: (err) => err.response?.data?.message || "Terjadi kesalahan.",
-      })
-      .finally(() => setIsSubmitting(false));
-  };
-
-  const handleBannerSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    const formData = new FormData(e.target);
-    const apiCall = currentBanner
-      ? api.put(`/banners/${currentBanner.id}`, formData)
-      : api.post("/banners", formData);
-
-    toast
-      .promise(apiCall, {
-        loading: "Menyimpan banner...",
-        success: (res) => {
-          fetchBanners();
           handleCloseModals();
           return res.data.message;
         },
@@ -180,10 +135,6 @@ const HomepageManagerPage = () => {
       case "slide":
         endpoint = `/header-slides/${id}`;
         fetcher = fetchSlides;
-        break;
-      case "banner":
-        endpoint = `/banners/${id}`;
-        fetcher = fetchBanners;
         break;
       case "login-banner":
         endpoint = `/login-banners/${id}`;
@@ -232,11 +183,12 @@ const HomepageManagerPage = () => {
     </div>
   );
 
-  const renderImageInput = (name, label, preview, onChange) => (
+  const renderImageInput = (name, label, preview, onChange, description) => (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">
         {label}
       </label>
+      {description && <p className="text-xs text-gray-500 mb-2">{description}</p>}
       <div className="flex items-center gap-4">
         {preview && (
           <Image
@@ -250,6 +202,7 @@ const HomepageManagerPage = () => {
         <input
           type="file"
           name={name}
+          id={name}
           accept="image/*"
           onChange={onChange}
           className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20"
@@ -286,16 +239,6 @@ const HomepageManagerPage = () => {
             }`}
           >
             Header Slider
-          </button>
-          <button
-            onClick={() => setActiveTab("banners")}
-            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === "banners"
-                ? "border-accent text-accent"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            }`}
-          >
-            Promo Banner
           </button>
         </nav>
       </div>
@@ -396,8 +339,9 @@ const HomepageManagerPage = () => {
               <table className="w-full text-sm text-left text-gray-600">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-100">
                   <tr>
-                    <th className="px-6 py-3">Gambar</th>
-                    <th className="px-6 py-3">Judul</th>
+                    <th className="px-6 py-3">Gambar Desktop</th>
+                    <th className="px-6 py-3">Gambar Mobile</th>
+                    <th className="px-6 py-3">Link</th>
                     <th className="px-6 py-3">Status</th>
                     <th className="px-6 py-3 text-right">Aksi</th>
                   </tr>
@@ -410,15 +354,31 @@ const HomepageManagerPage = () => {
                     >
                       <td className="px-6 py-4">
                         <Image
-                          src={baseUrl + slide.image_url}
-                          alt={slide.title}
+                          src={baseUrl + slide.image_url_desktop}
+                          alt="Desktop"
                           width={120}
                           height={60}
-                          className="rounded-md object-cover"
+                          className="rounded-md object-contain bg-gray-100"
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <Image
+                          src={baseUrl + slide.image_url_mobile}
+                          alt="Mobile"
+                          width={60}
+                          height={60}
+                          className="rounded-md object-contain bg-gray-100"
                         />
                       </td>
                       <td className="px-6 py-4 font-medium text-gray-900">
-                        {slide.title}
+                        <a
+                          href={slide.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:underline"
+                        >
+                          {slide.link}
+                        </a>
                       </td>
                       <td className="px-6 py-4">
                         <span
@@ -454,64 +414,6 @@ const HomepageManagerPage = () => {
             </div>
           </div>
         )}
-
-        {activeTab === "banners" && (
-          <div>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Kelola Promo Banner</h2>
-              {banners.length === 0 && (
-                <button
-                  onClick={() => handleOpenBannerModal()}
-                  className="flex items-center gap-2 bg-accent text-white px-4 py-2 rounded-md hover:bg-accent/90 font-semibold"
-                >
-                  <FaPlus /> Tambah Banner
-                </button>
-              )}
-            </div>
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              {banners.map((banner) => (
-                <div
-                  key={banner.id}
-                  className="flex justify-between items-center border-b pb-3 mb-3"
-                >
-                  <div>
-                    <p className="font-semibold">{banner.title}</p>
-                    <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        banner.is_active
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {banner.is_active ? "Aktif" : "Nonaktif"}
-                    </span>
-                  </div>
-                  <div className="flex justify-end gap-3">
-                    <button
-                      onClick={() => handleOpenBannerModal(banner)}
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      <FaEdit size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete("banner", banner.id)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <FaTrash size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {banners.length > 0 ? (
-                <p className="text-sm text-gray-500">
-                  Hanya satu banner yang bisa aktif dalam satu waktu.
-                </p>
-              ) : (
-                <p>Belum ada banner.</p>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Slide Modal */}
@@ -528,36 +430,12 @@ const HomepageManagerPage = () => {
               {currentSlide ? "Edit" : "Tambah"} Slide
             </h2>
             <form onSubmit={handleSlideSubmit} className="space-y-4">
-              {renderInput("title", "Judul Slide", currentSlide?.title, true)}
               {renderInput(
-                "offer_text",
-                "Teks Penawaran (di atas judul)",
-                currentSlide?.offer_text
+                "link",
+                "Link Tujuan (URL)",
+                currentSlide?.link,
+                true
               )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderInput(
-                  "button1_text",
-                  "Teks Tombol 1",
-                  currentSlide?.button1_text
-                )}
-                {renderInput(
-                  "button1_link",
-                  "Link Tombol 1",
-                  currentSlide?.button1_link
-                )}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderInput(
-                  "button2_text",
-                  "Teks Tombol 2",
-                  currentSlide?.button2_text
-                )}
-                {renderInput(
-                  "button2_link",
-                  "Link Tombol 2",
-                  currentSlide?.button2_link
-                )}
-              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {renderInput(
                   "display_order",
@@ -585,125 +463,28 @@ const HomepageManagerPage = () => {
                 </div>
               </div>
               {renderImageInput(
-                "image",
-                "Gambar Slide",
-                slideImagePreview,
+                "image_desktop",
+                "Gambar Desktop",
+                slideImagePreviews.desktop,
                 (e) =>
                   e.target.files[0] &&
-                  setSlideImagePreview(URL.createObjectURL(e.target.files[0]))
-              )}
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={handleCloseModals}
-                  className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-4 py-2 rounded bg-accent text-white hover:bg-accent/90 disabled:bg-gray-400"
-                >
-                  {isSubmitting ? "Menyimpan..." : "Simpan"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Banner Modal */}
-      {isBannerModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl m-4 relative max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={handleCloseModals}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
-            >
-              <FaTimes size={20} />
-            </button>
-            <h2 className="text-xl font-bold mb-6">
-              {currentBanner ? "Edit" : "Tambah"} Banner
-            </h2>
-            <form onSubmit={handleBannerSubmit} className="space-y-4">
-              {renderInput("title", "Judul Banner", currentBanner?.title, true)}
-              <div>
-                <label
-                  htmlFor="description"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Deskripsi
-                </label>
-                <textarea
-                  name="description"
-                  id="description"
-                  defaultValue={currentBanner?.description}
-                  rows="3"
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                ></textarea>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderInput(
-                  "button_text",
-                  "Teks Tombol",
-                  currentBanner?.button_text
-                )}
-                {renderInput(
-                  "button_link",
-                  "Link Tombol",
-                  currentBanner?.button_link
-                )}
-              </div>
-              <div>
-                <label
-                  htmlFor="is_active"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Status
-                </label>
-                <select
-                  name="is_active"
-                  id="is_active"
-                  defaultValue={currentBanner?.is_active ?? true}
-                  className="w-full p-2 border border-gray-300 rounded-md bg-white"
-                >
-                  <option value="true">Aktif</option>
-                  <option value="false">Nonaktif</option>
-                </select>
-              </div>
-              {renderImageInput(
-                "image_left",
-                "Gambar Kiri (Desktop)",
-                bannerImagePreviews.image_left,
-                (e) =>
-                  e.target.files[0] &&
-                  setBannerImagePreviews((p) => ({
+                  setSlideImagePreviews((p) => ({
                     ...p,
-                    image_left: URL.createObjectURL(e.target.files[0]),
-                  }))
-              )}
-              {renderImageInput(
-                "image_right",
-                "Gambar Kanan (Desktop)",
-                bannerImagePreviews.image_right,
-                (e) =>
-                  e.target.files[0] &&
-                  setBannerImagePreviews((p) => ({
-                    ...p,
-                    image_right: URL.createObjectURL(e.target.files[0]),
-                  }))
+                    desktop: URL.createObjectURL(e.target.files[0]),
+                  })),
+                "Rekomendasi ukuran: 1920x720 pixel."
               )}
               {renderImageInput(
                 "image_mobile",
-                "Gambar (Mobile)",
-                bannerImagePreviews.image_mobile,
+                "Gambar Mobile",
+                slideImagePreviews.mobile,
                 (e) =>
                   e.target.files[0] &&
-                  setBannerImagePreviews((p) => ({
+                  setSlideImagePreviews((p) => ({
                     ...p,
-                    image_mobile: URL.createObjectURL(e.target.files[0]),
-                  }))
+                    mobile: URL.createObjectURL(e.target.files[0]),
+                  })),
+                "Rekomendasi ukuran: 800x800 pixel."
               )}
               <div className="flex justify-end gap-3 pt-4">
                 <button
@@ -774,7 +555,8 @@ const HomepageManagerPage = () => {
                   e.target.files[0] &&
                   setLoginBannerImagePreview(
                     URL.createObjectURL(e.target.files[0])
-                  )
+                  ),
+                "Rekomendasi ukuran: 400x600 pixel."
               )}
               <div className="flex justify-end gap-3 pt-4">
                 <button

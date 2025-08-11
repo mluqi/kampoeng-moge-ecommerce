@@ -6,23 +6,25 @@ import Footer from "@/components/Footer";
 import Loading from "@/components/Loading";
 import { useProduct } from "@/contexts/ProductContext";
 import { useCategory } from "@/contexts/CategoryContext";
+import ProductFilterBarOld from "@/components/ProductFilterBarOld";
 
-const PRODUCTS_PER_PAGE = 10;
+const PRODUCTS_PER_PAGE = 20;
 
 const AllProducts = () => {
-  const { products, loading, fetchProducts } = useProduct();
+  const { products, loading, fetchPublicProducts } = useProduct();
   const { categories, fetchCategories } = useCategory();
 
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  // Mengubah state awal agar konsisten dengan value di filter bar
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+  const [selectedSort, setSelectedSort] = useState("newest");
 
-  // Debounce search input untuk mengurangi request API
+  // Debounce search input dan reset halaman ke-1 saat filter berubah
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
-      setCurrentPage(1); // Reset ke halaman 1 setiap kali ada pencarian baru
     }, 500); // Delay 500ms
 
     return () => {
@@ -30,26 +32,33 @@ const AllProducts = () => {
     };
   }, [searchTerm]);
 
+  // Reset ke halaman 1 setiap kali ada filter yang berubah
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, debouncedSearchTerm, selectedSort]);
+
   // Fetch data dari server ketika filter berubah
   useEffect(() => {
-    fetchProducts({
+    fetchPublicProducts({
       page: currentPage,
       limit: PRODUCTS_PER_PAGE,
-      category: selectedCategory === "All" ? "" : selectedCategory,
+      category: selectedCategory,
       search: debouncedSearchTerm,
       status: "active",
+      sort: selectedSort,
     });
-  }, [currentPage, selectedCategory, debouncedSearchTerm, fetchProducts]);
+  }, [
+    currentPage,
+    selectedCategory,
+    debouncedSearchTerm,
+    selectedSort,
+    fetchPublicProducts,
+  ]);
 
   // Fetch kategori saat komponen dimuat
   useEffect(() => {
     if (!categories || categories.length === 0) fetchCategories();
   }, [categories, fetchCategories]);
-
-  // Reset ke halaman 1 saat filter/search berubah
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedCategory]);
 
   const displayedProducts = products.data;
   const totalPages = products.totalPages;
@@ -75,32 +84,15 @@ const AllProducts = () => {
           />
         </div>
 
-        {/* Filter Kategori */}
-        <div className="flex flex-wrap justify-start gap-3 mt-6 w-full">
-          <button
-            key="All"
-            onClick={() => setSelectedCategory("All")}
-            className={`px-4 py-1.5 rounded-full text-sm transition ${
-              selectedCategory === "All"
-                ? "bg-accent text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
-          >
-            All
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat.category_id}
-              onClick={() => setSelectedCategory(cat.category_id)}
-              className={`px-4 py-1.5 rounded-full text-sm transition ${
-                selectedCategory === cat.category_id
-                  ? "bg-accent text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
-            >
-              {cat.category_name}
-            </button>
-          ))}
+        {/* Filter Bar */}
+        <div className="mt-6 w-full">
+          <ProductFilterBarOld
+            categories={categories}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            selectedSort={selectedSort}
+            onSortChange={setSelectedSort}
+          />
         </div>
 
         {/* Daftar Produk */}
@@ -121,7 +113,7 @@ const AllProducts = () => {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {products.data && (
           <div className="flex justify-center items-center gap-2 mt-4 mb-16 w-full flex-wrap">
             <button
               disabled={currentPage === 1}

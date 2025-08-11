@@ -36,6 +36,26 @@ export const ProductProvider = ({ children }) => {
     }
   }, []);
 
+  const fetchPublicProducts = useCallback(async (params = {}) => {
+    setLoading(true);
+    setError("");
+    try {
+      const query = new URLSearchParams(params).toString();
+      const res = await api.get(`/products/all-products?${query}`);
+      setProducts(res.data);
+    } catch (err) {
+      setError(err?.response?.data?.message || "Gagal mengambil produk");
+      setProducts({
+        data: [],
+        totalPages: 1,
+        currentPage: 1,
+        totalProducts: 0,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const fetchProductById = async (id) => {
     setLoading(true);
     setError("");
@@ -125,6 +145,7 @@ export const ProductProvider = ({ children }) => {
         loading,
         error,
         fetchProducts,
+        fetchPublicProducts,
         fetchProductById,
         addProduct,
         updateProduct,

@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { useProduct } from "@/contexts/ProductContext";
 import { useCategory } from "@/contexts/CategoryContext";
 import toast from "react-hot-toast";
+import ProductTiktokActions from "@/components/admin/ProductTiktokActions";
+import api from "@/service/api";
 
 const PRODUCTS_PER_PAGE = 10;
 const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -15,6 +17,8 @@ const ProductList = () => {
   const router = useRouter();
   const { products, loading, error, fetchProducts, updateProductStatus } =
     useProduct();
+  const [tiktokStatuses, setTiktokStatuses] = useState({});
+
   const { categories, fetchCategories } = useCategory();
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -52,6 +56,25 @@ const ProductList = () => {
     selectedCategory,
     statusFilter,
   ]);
+
+  const handleCheckTiktokStatus = async (product) => {
+    try {
+      const res = await api.get(
+        `/products/tiktok/${product.product_tiktok_id}/status`
+      );
+
+      setTiktokStatuses((prev) => ({
+        ...prev,
+        [product.product_id]: res.data.status,
+      }));
+    } catch (e) {
+      toast.error("Gagal mengambil status TikTok");
+      setTiktokStatuses((prev) => ({
+        ...prev,
+        [product.product_id]: null,
+      }));
+    }
+  };
 
   const handleToggleStatus = async (product) => {
     const newStatus =
@@ -209,6 +232,9 @@ const ProductList = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status Tiktok
+                    </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Aksi
                     </th>
@@ -236,15 +262,16 @@ const ProductList = () => {
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">
-                                {product.product_name.length > 80
+                                {product.product_name.length > 40
                                   ? `${product.product_name.substring(
                                       0,
-                                      80
+                                      40
                                     )}...`
                                   : product.product_name}
                               </div>
                               <div className="text-sm text-gray-500">
-                                ID: {product.product_id}
+                                ID: {product.product_id} || SKU:{" "}
+                                {product.product_sku}
                               </div>
                             </div>
                           </div>
@@ -293,6 +320,35 @@ const ProductList = () => {
                               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-accent after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
                             </label>
                           </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {/* Kolom Status Tiktok */}
+                          {typeof tiktokStatuses[product.product_id] ===
+                          "undefined" ? (
+                            product.product_tiktok_id ? (
+                              <button
+                                className="px-3 py-1 bg-accent text-white rounded text-xs cursor-pointer hover:bg-accent/90 transition-colors"
+                                onClick={() => handleCheckTiktokStatus(product)}
+                              >
+                                Cek Status TikTok
+                              </button>
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">
+                                Tidak terhubung TikTok
+                              </span>
+                            )
+                          ) : (
+                            <ProductTiktokActions
+                              product={{
+                                ...product,
+                                tiktok_status:
+                                  tiktokStatuses[product.product_id],
+                              }}
+                              onActionComplete={() =>
+                                handleCheckTiktokStatus(product)
+                              }
+                            />
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end space-x-2">

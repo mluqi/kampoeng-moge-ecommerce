@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { assets } from "@/assets/assets";
 import Image from "next/image";
 import Link from "next/link";
 import api from "@/service/api";
@@ -9,13 +8,9 @@ const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 interface Slide {
   id: number;
-  title: string;
-  offer_text: string;
-  image_url: string;
-  button1_text: string;
-  button1_link: string;
-  button2_text: string;
-  button2_link: string;
+  link: string;
+  image_url_desktop: string;
+  image_url_mobile: string;
 }
 
 const HeaderSlider = () => {
@@ -68,43 +63,28 @@ const HeaderSlider = () => {
         }}
       >
         {slides.map((slide, index) => (
-          <div
-            key={slide.id}
-            className="flex flex-col-reverse md:flex-row items-center justify-between bg-[#E6E9F2] py-8 md:px-14 px-5 mt-6 rounded-xl min-w-full"
-          >
-            <div className="md:pl-8 mt-10 md:mt-0">
-              <p className="md:text-base text-accent pb-1">{slide.offer_text}</p>
-              <h1 className="max-w-lg md:text-[40px] md:leading-[48px] text-2xl font-bold">
-                {slide.title}
-              </h1>
-              <div className="flex items-center mt-4 md:mt-6 ">
-                <Link href={slide.button1_link || "#"} passHref>
-                  <button className="md:px-10 px-7 md:py-2.5 py-2 bg-accent rounded-full text-white font-medium hover:bg-accent/90 transition">
-                    {slide.button1_text || "Beli Sekarang"}
-                  </button>
-                </Link>
-                <Link href={slide.button2_link || "#"} passHref>
-                  <button className="group flex items-center gap-2 px-6 py-2.5 font-medium hover:text-accent transition">
-                    {slide.button2_text || "Lihat Detail"}
-                    <Image
-                      className="group-hover:translate-x-1 transition"
-                      src={assets.arrow_icon}
-                      alt="arrow_icon"
-                    />
-                  </button>
-                </Link>
-              </div>
-            </div>
-            <div className="flex items-center flex-1 justify-center">
+          <div key={slide.id} className="min-w-full mt-6 flex-shrink-0">
+            <Link
+              href={slide.link || "/"}
+              className="block relative py-8 md:px-14 px-5 mt-6 rounded-xl min-w-full h-[350px] md:h-[328px] overflow-hidden"
+            >
+              {/* Gambar untuk Desktop */}
               <Image
-                className="md:w-72 w-48"
-                src={baseUrl + slide.image_url}
-                alt={`Slide ${index + 1}`}
-                width={288}
-                height={288}
+                className="hidden md:block object-cover"
+                src={baseUrl + slide.image_url_desktop}
+                alt={`Slide Desktop ${index + 1}`}
+                layout="fill"
                 priority={index === 0}
               />
-            </div>
+              {/* Gambar untuk Mobile */}
+              <Image
+                className="block md:hidden object-cover"
+                src={baseUrl + slide.image_url_mobile}
+                alt={`Slide Mobile ${index + 1}`}
+                fill
+                priority={index === 0}
+              />
+            </Link>
           </div>
         ))}
       </div>

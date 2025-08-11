@@ -186,7 +186,7 @@ const CheckoutPage = () => {
   }, [selectedAddress, totalWeightKg, itemsToCheckout.length]);
 
   const shippingCost = selectedShipping?.cost || 0;
-  const [finalTotal, paymentFee ]= useMemo(() => {
+  const [finalTotal, paymentFee] = useMemo(() => {
     let paymentFee = 0;
     const subtotalPlusShipping = selectedCartTotal + shippingCost;
     let ppn = 0;
@@ -241,6 +241,12 @@ const CheckoutPage = () => {
     }
     if (!selectedPayment) {
       toast.error("Silakan pilih metode pembayaran.");
+      return;
+    }
+    if (!profile?.phone) {
+      toast.error(
+        "Silakan lengkapi nomor telepon di profil Anda sebelum melanjutkan."
+      );
       return;
     }
 

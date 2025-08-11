@@ -104,17 +104,18 @@ const ProductDetailEdit = () => {
         }
         if (fetched.product_attributes_tiktok) {
           try {
-            const parsedAttributes = JSON.parse(
-              fetched.product_attributes_tiktok
-            );
-            // Ubah format dari array API ke objek untuk prop `initialAttributes`
+            const parsedAttributes = fetched.product_attributes_tiktok;
             const initialAttrs = parsedAttributes.reduce((acc, attr) => {
-              acc[attr.id] = {
-                id: attr.values[0].id,
-                name: attr.values[0].name,
-              };
+              const firstValue = attr.values?.[0];
+              if (firstValue) {
+                acc[attr.id] = {
+                  id: firstValue.id,
+                  name: firstValue.name,
+                };
+              }
               return acc;
             }, {});
+
             setInitialTiktokAttributes(initialAttrs);
           } catch (e) {
             console.error("Gagal mem-parsing atribut TikTok:", e);
@@ -132,7 +133,7 @@ const ProductDetailEdit = () => {
           status: fetched.product_status || "active",
           category: fetched.product_category || "",
           weight: fetched.product_weight || "",
-          dimension: fetched.product_dimensions || "",
+          dimension: JSON.stringify(dimensionData),
           annotations: fetched.product_annotations || "",
           brand: fetched.product_brand || "",
         });
@@ -149,25 +150,28 @@ const ProductDetailEdit = () => {
   }, [id, categories.length]);
 
   // Callback untuk menerima data dari ProductTiktokSection
-  const handleTiktokDataChange = useCallback((attributeValues, categoryId, keyword) => {
-    setTiktokCategoryId(categoryId);
-    setCategoryKeyword(keyword);
+  const handleTiktokDataChange = useCallback(
+    (attributeValues, categoryId, keyword) => {
+      setTiktokCategoryId(categoryId);
+      setCategoryKeyword(keyword);
 
-    // Format atribut untuk payload API
-    const formattedAttributes = Object.entries(attributeValues)
-      .filter(([, value]) => value && value.name)
-      .map(([attrId, value]) => {
-        const attributeValue = { name: value.name };
-        if (value.id) {
-          attributeValue.id = value.id;
-        }
-        return {
-          id: attrId,
-          values: [attributeValue],
-        };
-      });
-    setTiktokProductAttributes(formattedAttributes);
-  }, []);
+      // Format atribut untuk payload API
+      const formattedAttributes = Object.entries(attributeValues)
+        .filter(([, value]) => value && value.name)
+        .map(([attrId, value]) => {
+          const attributeValue = { name: value.name };
+          if (value.id) {
+            attributeValue.id = value.id;
+          }
+          return {
+            id: attrId,
+            values: [attributeValue],
+          };
+        });
+      setTiktokProductAttributes(formattedAttributes);
+    },
+    []
+  );
 
   const refreshProductData = useCallback(async () => {
     const toastId = toast.loading("Memuat ulang data produk...");

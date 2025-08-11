@@ -30,10 +30,8 @@ const ProductCard = ({ product }) => {
 
     if (isWishlisted) {
       removeFromWishlist(product.product_id);
-      // toast.success("Removed from wishlist");
     } else {
       addToWishlist(product.product_id);
-      // toast.success("Added to wishlist");
     }
   };
 
@@ -44,16 +42,18 @@ const ProductCard = ({ product }) => {
 
   const handleBuyNowClick = (e) => {
     e.stopPropagation();
-    
+
     if (!user) {
-      toast.error("Silakan login terlebih dahulu", { icon: '🔒', position: 'top-center', style: { background: '#ff4444', color: '#fff' } });
-      // router.push("/account"); // Redirect to login page
-      return; 
+      toast.error("Silakan login terlebih dahulu", {
+        icon: "🔒",
+        position: "top-center",
+        style: { background: "#ff4444", color: "#fff" },
+      });
+      return;
     }
 
     if (isOutOfStock) return;
-    
-    // Add product to cart using the context
+
     addToCart(product.product_id);
   };
 
@@ -65,12 +65,18 @@ const ProductCard = ({ product }) => {
     return (
       <div className="flex items-center gap-0.5">
         {[...Array(fullStars)].map((_, i) => (
-          <FiStar key={`full-${i}`} className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+          <FiStar
+            key={`full-${i}`}
+            className="w-3 h-3 text-yellow-500 fill-yellow-500"
+          />
         ))}
         {hasHalfStar && (
           <div className="relative w-3 h-3">
             <FiStar className="absolute w-3 h-3 text-gray-300" />
-            <div className="absolute w-3 h-3 overflow-hidden" style={{ width: '50%' }}>
+            <div
+              className="absolute w-3 h-3 overflow-hidden"
+              style={{ width: "50%" }}
+            >
               <FiStar className="w-3 h-3 text-yellow-500 fill-yellow-500" />
             </div>
           </div>
@@ -89,19 +95,6 @@ const ProductCard = ({ product }) => {
         isOutOfStock ? "opacity-75" : ""
       }`}
     >
-      {/* Wishlist Button */}
-      <button
-        onClick={handleWishlistClick}
-        className="absolute top-3 right-3 z-10 p-2 bg-white/90 rounded-full shadow-sm hover:scale-110 transition-transform"
-        aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
-      >
-        <FaHeart
-          className={`w-4 h-4 transition-colors ${
-            isWishlisted ? "text-red-500" : "text-gray-300 group-hover:text-red-400"
-          }`}
-        />
-      </button>
-
       {/* Product Image */}
       <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden mb-3">
         <Image
@@ -125,23 +118,14 @@ const ProductCard = ({ product }) => {
             </span>
           </div>
         )}
-
-        {/* Buy Now Button (Mobile) */}
-        <button
-          onClick={handleBuyNowClick}
-          disabled={isOutOfStock}
-          className="md:hidden absolute bottom-3 left-1/2 -translate-x-1/2 bg-white/90 text-accent px-4 py-2 rounded-full text-sm font-medium shadow-md hover:bg-white transition-all opacity-0 group-hover:opacity-100"
-        >
-          <FaShoppingCart className="inline mr-1" /> Beli
-        </button>
       </div>
 
       {/* Product Info */}
-      <div className="p-1">
+      <div className="p-1 flex flex-col flex-grow">
         <h3 className="font-medium text-gray-900 mb-1 line-clamp-2 h-[2.8em]">
           {product.product_name}
         </h3>
-        
+
         {/* Rating */}
         <div className="flex items-center gap-2 mb-2">
           {renderRatingStars(product.product_average_rating || 0)}
@@ -151,20 +135,38 @@ const ProductCard = ({ product }) => {
         </div>
 
         {/* Price */}
-        <div className="flex items-end justify-between">
+        <div className="flex items-end justify-between mt-auto">
           <p className="text-lg font-bold text-gray-900">
             Rp {product.product_price?.toLocaleString("id-ID")}
           </p>
 
-          {/* Buy Now Button (Desktop) */}
-          <button
-            onClick={handleBuyNowClick}
-            disabled={isOutOfStock}
-            className="hidden md:flex items-center gap-1 px-3 py-1.5 bg-accent text-white text-sm rounded-full hover:bg-accent/90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed cursor-pointer"
-          >
-            <FaShoppingCart className="w-3 h-3" />
-            <span>Beli</span>
-          </button>
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            {/* Wishlist Button (Always visible on mobile) */}
+            <button
+              onClick={handleWishlistClick}
+              className="p-2 bg-white rounded-full shadow-sm md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+              aria-label={
+                isWishlisted ? "Remove from wishlist" : "Add to wishlist"
+              }
+            >
+              <FaHeart
+                className={`w-4 h-4 ${
+                  isWishlisted ? "text-red-500" : "text-gray-300"
+                }`}
+              />
+            </button>
+
+            {/* Buy Now Button */}
+            <button
+              onClick={handleBuyNowClick}
+              disabled={isOutOfStock}
+              className="flex items-center gap-1 px-3 py-1.5 bg-accent text-white text-sm rounded-full hover:bg-accent/90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+              <FaShoppingCart className="w-3 h-3" />
+              <span className="hidden md:inline">Beli</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -116,7 +116,7 @@ const ProductTiktokSection = ({
       }
       return;
     }
-  
+
     const fetchAttributes = async () => {
       setIsLoadingAttributes(true);
       try {
@@ -125,15 +125,18 @@ const ProductTiktokSection = ({
         );
         const attributes = response.data || [];
         setTiktokAttributes(attributes);
-  
+
         // --- Tambahkan merge logic di sini ---
         if (isEditMode && initialAttributes) {
-          setAttributeValues(prev => {
+          setAttributeValues((prev) => {
             const merged = {};
-            attributes.forEach(attr => {
+            attributes.forEach((attr) => {
               // Pastikan ID sama tipe data (string)
               const attrId = String(attr.id);
-              merged[attrId] = initialAttributes[attrId] || { id: "", name: "" };
+              merged[attrId] = initialAttributes[attrId] || {
+                id: "",
+                name: "",
+              };
             });
             return merged;
           });
@@ -146,7 +149,7 @@ const ProductTiktokSection = ({
         setIsLoadingAttributes(false);
       }
     };
-  
+
     fetchAttributes();
   }, [selectedTiktokCategory, isEditMode, initialAttributes]);
 

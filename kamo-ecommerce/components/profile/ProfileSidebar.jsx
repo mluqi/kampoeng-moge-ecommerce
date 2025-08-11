@@ -26,7 +26,7 @@ const ProfileSidebar = () => {
   const activeTab = searchParams.get("tab") || "profile";
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm h-full">
+    <div className="bg-white p-6 rounded-lg shadow-sm h-[calc(60vh-4rem)] overflow-y-auto">
       <div className="flex flex-col items-center mb-6 pb-6 border-b">
         <Image
           src={profile?.user_photo || user?.image || assets.user_icon}

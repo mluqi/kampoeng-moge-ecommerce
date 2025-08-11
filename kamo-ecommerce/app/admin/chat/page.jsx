@@ -12,7 +12,6 @@ const AdminChatPage = () => {
   const {
     conversations,
     loading: loadingConversations,
-    socket,
     sendMessageFromAdmin,
     markConversationAsReadInState,
   } = useAdminChat();
@@ -20,26 +19,44 @@ const AdminChatPage = () => {
   const [messages, setMessages] = useState(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
 
-  // Listener untuk pesan baru, hanya untuk jendela chat yang sedang aktif
+  // [BARU] Polling untuk pesan baru di jendela chat yang aktif
   useEffect(() => {
-    if (socket) {
-      const handleReceiveMessage = (newMessage) => {
-        // Hanya update jika pesan untuk percakapan yang sedang dipilih
-        if (newMessage.conversationId === selectedConversationId) {
-          // Tambahkan pengecekan untuk menghindari duplikasi
+    if (!selectedConversationId) return;
+
+    const pollForNewMessages = async () => {
+      // Jangan poll jika tab tidak aktif untuk efisiensi
+      if (document.hidden) return;
+
+      const lastMessage =
+        messages && messages.length > 0 ? messages[messages.length - 1] : null;
+      const lastMessageId = lastMessage ? lastMessage.id : 0;
+
+      try {
+        const res = await api.get(`/chat/admin/new-messages`, {
+          params: {
+            conversationId: selectedConversationId,
+            lastMessageId: lastMessageId,
+          },
+        });
+
+        if (res.data && res.data.length > 0) {
           setMessages((prev) => {
-            if (prev && prev.find(msg => msg.id === newMessage.id)) return prev;
-            return prev ? [...prev, newMessage] : [newMessage];
+            const existingIds = new Set(prev.map((m) => m.id));
+            const newUniqueMessages = res.data.filter(
+              (m) => !existingIds.has(m.id)
+            );
+            return [...prev, ...newUniqueMessages];
           });
         }
-      };
+      } catch (error) {
+        console.error("Polling for new messages failed", error);
+      }
+    };
 
-      socket.on("receive_message", handleReceiveMessage);
-      return () => {
-        socket.off("receive_message", handleReceiveMessage);
-      };
-    }
-  }, [socket, selectedConversationId]);
+    const intervalId = setInterval(pollForNewMessages, 3000); // Poll setiap 3 detik
+
+    return () => clearInterval(intervalId);
+  }, [selectedConversationId, messages]); // `messages` sebagai dependency
 
   // Fetch pesan saat percakapan dipilih
   const handleSelectConversation = async (convoId) => {
@@ -68,13 +85,13 @@ const AdminChatPage = () => {
   const handleSendMessage = async (content) => {
     if (!selectedConversationId) return;
     try {
-      // Hapus pembaruan optimis di sini.
-      // Biarkan listener socket yang menangani penambahan pesan ke UI.
-      // Ini memastikan hanya ada satu sumber kebenaran (socket event).
-      await sendMessageFromAdmin(
+      // [DIUBAH] Pembaruan UI optimis
+      const sentMessage = await sendMessageFromAdmin(
         selectedConversationId,
         content
       );
+      // Tambahkan pesan yang baru dikirim ke state messages secara langsung
+      setMessages((prev) => [...prev, sentMessage]);
     } catch (error) {
       console.error("Gagal mengirim pesan dari halaman chat:", error);
     }
