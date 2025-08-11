@@ -1,8 +1,15 @@
-const { Product, Category } = require("../models");
+const {
+  Product,
+  Category,
+  ProductViews,
+  User,
+  admin_akses,
+} = require("../models");
 const { getToken } = require("next-auth/jwt");
 const { Op } = require("sequelize");
 const fs = require("fs");
 const path = require("path");
+const jwt = require("jsonwebtoken");
 
 // Helper function to safely parse JSON fields from a product object
 const parseProductJSONFields = (productInstance) => {
@@ -21,7 +28,10 @@ const parseProductJSONFields = (productInstance) => {
       try {
         product[field.key] = JSON.parse(value);
       } catch (e) {
-        console.error(`Error parsing ${field.key} for product ${product.product_id}:`, e.message);
+        console.error(
+          `Error parsing ${field.key} for product ${product.product_id}:`,
+          e.message
+        );
         product[field.key] = field.default; // Fallback to default on parsing error
       }
     } else if (!value) {
@@ -31,16 +41,21 @@ const parseProductJSONFields = (productInstance) => {
   return product;
 };
 
-function deleteFiles(files) {
-  if (!files) return;
+function deleteFiles(files, subfolder) {
+  if (!files || !Array.isArray(files) || !subfolder) return;
   files.forEach((file) => {
+    if (typeof file !== "string" || !file) return;
     const filePath = path.join(
       __dirname,
-      "../uploads/products",
+      `../uploads/${subfolder}`,
       path.basename(file)
     );
     if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+      try {
+        fs.unlinkSync(filePath);
+      } catch (err) {
+        console.error(`Failed to delete file: ${filePath}`, err);
+      }
     }
   });
 }
@@ -115,17 +130,76 @@ exports.getAllProducts = async (req, res) => {
   }
 };
 
+exports.getAllProductsWithoutOutOfStock = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 12,
+      category,
+      search,
+      status,
+      sort = "newest",
+    } = req.query;
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const offset = (pageNum - 1) * limitNum;
+
+    let whereClause = {};
+
+    whereClause.product_stock = { [Op.gt]: 0 };
+
+    if (category && category !== "All") {
+      whereClause.product_category = category;
+    }
+
+    if (search) {
+      whereClause.product_name = {
+        [Op.like]: `%${search}%`,
+      };
+    }
+
+    if (status && ["active", "inactive"].includes(status)) {
+      whereClause.product_status = status;
+    }
+
+    let orderClause = [];
+    switch (sort) {
+      case "highest-price":
+        orderClause.push(["product_price", "DESC"]);
+        break;
+      case "lowest-price":
+        orderClause.push(["product_price", "ASC"]);
+        break;
+      case "most-sold":
+        orderClause.push(["product_sold", "DESC"]);
+        break;
+      case "newest":
+      default:
+        orderClause.push(["createdAt", "DESC"]);
+    }
+
+    const { count, rows } = await Product.findAndCountAll({
+      where: whereClause,
+      include: [{ model: Category, as: "category" }],
+      limit: limitNum,
+      offset: offset,
+      order: orderClause,
+    });
+
+    res.status(200).json({
+      data: rows.map(parseProductJSONFields), // Parse JSON fields before sending
+      totalPages: Math.ceil(count / limitNum),
+      currentPage: pageNum,
+      totalProducts: count,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Get product by ID
 exports.getProductById = async (req, res) => {
-  // const token = await getToken({
-  //   req,
-  //   secret: process.env.NEXTAUTH_SECRET,
-  //   secureCookie: process.env.NODE_ENV === "production",
-  // });
-  // if (!token) {
-  //   return res.status(401).json({ message: "Unauthorized" });
-  // }
-
   try {
     const product = await Product.findByPk(req.params.id, {
       include: [{ model: Category, as: "category" }],
@@ -135,26 +209,23 @@ exports.getProductById = async (req, res) => {
     // Parse the JSON fields before further processing and sending the response
     const parsedProduct = parseProductJSONFields(product);
 
-    // --- START TIKTOK STATUS INTEGRATION ---
-    if (product.product_tiktok_id) {
-      try {
-        const { getSingleProductDetails } = require("../services/tiktokShop");
-        const tiktokResponse = await getSingleProductDetails(
-          product.product_tiktok_id
-        );
-
-        if (tiktokResponse?.data?.status) {
-          parsedProduct.tiktok_status = tiktokResponse.data.status;
-        }
-      } catch (tiktokError) {
-        console.error(
-          `⚠️  Could not fetch product status from TikTok Shop for product ${product.product_id}.`,
-          tiktokError
-        );
-      }
-    }
-
     res.status(200).json(parsedProduct);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.getProductStatusTiktok = async (req, res) => {
+  console.log("Fetching TikTok product status for ID:", req.params.id);
+  try {
+    // --- START TIKTOK STATUS INTEGRATION ---
+    const { getSingleProductDetails } = require("../services/tiktokShop");
+    const tiktokResponse = await getSingleProductDetails(req.params.id);
+
+    res.status(200).json({
+      message: "Product status updated",
+      status: tiktokResponse.data.status,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -217,14 +288,28 @@ exports.createProduct = async (req, res) => {
     const { length, width, height } = parsedDimensions;
     const weightKg = parseFloat(weight);
 
-    if (length <= 0 || length > 60 || width <= 0 || width > 60 || height <= 0 || height > 60) {
-      return res.status(400).json({ message: "Setiap dimensi (panjang, lebar, tinggi) harus antara 0.01 dan 60 cm." });
+    if (
+      length <= 0 ||
+      length > 60 ||
+      width <= 0 ||
+      width > 60 ||
+      height <= 0 ||
+      height > 60
+    ) {
+      return res.status(400).json({
+        message:
+          "Setiap dimensi (panjang, lebar, tinggi) harus antara 0.01 dan 60 cm.",
+      });
     }
 
     if (weightKg > 0) {
       const chargeableWeightRatio = (length * width * height) / 6000 / weightKg;
       if (chargeableWeightRatio >= 1.1) {
-        return res.status(400).json({ message: `Rasio berat yang dapat ditagih terlalu tinggi (${chargeableWeightRatio.toFixed(2)}). Seharusnya kurang dari 1.1. Rumus: (P x L x T / 6000) / Berat.` });
+        return res.status(400).json({
+          message: `Rasio berat yang dapat ditagih terlalu tinggi (${chargeableWeightRatio.toFixed(
+            2
+          )}). Seharusnya kurang dari 1.1. Rumus: (P x L x T / 6000) / Berat.`,
+        });
       }
     }
   } catch (e) {
@@ -242,7 +327,7 @@ exports.createProduct = async (req, res) => {
   const categoryExists = await Category.findByPk(category);
 
   if (!categoryExists) {
-    deleteFiles(pictures);
+    deleteFiles(pictures, "products");
     return res.status(400).json({ message: "Category not found" });
   }
 
@@ -341,7 +426,7 @@ exports.createProduct = async (req, res) => {
           deleteFiles(pictures);
           return res.status(500).json({ message: "Failed to create product" });
         }
-        
+
         console.log(
           "✅ Product successfully created on TikTok Shop:",
           tiktokResponse?.data || tiktokResponse
@@ -377,6 +462,7 @@ exports.createProduct = async (req, res) => {
 
 // Update product
 exports.updateProduct = async (req, res) => {
+  console.log(req.body);
   const {
     name,
     description,
@@ -417,7 +503,11 @@ exports.updateProduct = async (req, res) => {
       .json({ message: "Judul produk harus antara 25 dan 255 karakter." });
   }
 
-  if (description && (description.replace(/<[^>]*>?/gm, "").length < 60 || description.length > 10000)) {
+  if (
+    description &&
+    (description.replace(/<[^>]*>?/gm, "").length < 60 ||
+      description.length > 10000)
+  ) {
     return res.status(400).json({
       message: "Deskripsi produk harus antara 60 dan 10.000 karakter.",
     });
@@ -428,14 +518,28 @@ exports.updateProduct = async (req, res) => {
     const { length, width, height } = parsedDimensions;
     const weightKg = parseFloat(weight);
 
-    if (length <= 0 || length > 60 || width <= 0 || width > 60 || height <= 0 || height > 60) {
-      return res.status(400).json({ message: "Setiap dimensi (panjang, lebar, tinggi) harus antara 0.01 dan 60 cm." });
+    if (
+      length <= 0 ||
+      length > 60 ||
+      width <= 0 ||
+      width > 60 ||
+      height <= 0 ||
+      height > 60
+    ) {
+      return res.status(400).json({
+        message:
+          "Setiap dimensi (panjang, lebar, tinggi) harus antara 0.01 dan 60 cm.",
+      });
     }
 
     if (weightKg > 0) {
       const chargeableWeightRatio = (length * width * height) / 6000 / weightKg;
       if (chargeableWeightRatio >= 1.1) {
-        return res.status(400).json({ message: `Rasio berat yang dapat ditagih terlalu tinggi (${chargeableWeightRatio.toFixed(2)}). Seharusnya kurang dari 1.1. Rumus: (P x L x T / 6000) / Berat.` });
+        return res.status(400).json({
+          message: `Rasio berat yang dapat ditagih terlalu tinggi (${chargeableWeightRatio.toFixed(
+            2
+          )}). Seharusnya kurang dari 1.1. Rumus: (P x L x T / 6000) / Berat.`,
+        });
       }
     }
   } catch (e) {
@@ -458,7 +562,10 @@ exports.updateProduct = async (req, res) => {
     }
 
     let oldPictures = [];
-    if (product.product_pictures && typeof product.product_pictures === "string") {
+    if (
+      product.product_pictures &&
+      typeof product.product_pictures === "string"
+    ) {
       try {
         const parsed = JSON.parse(product.product_pictures);
         // Pastikan hasil parse adalah array
@@ -466,7 +573,10 @@ exports.updateProduct = async (req, res) => {
           oldPictures = parsed;
         }
       } catch (e) {
-        console.error(`Gagal mem-parsing product_pictures lama untuk produk ${req.params.id}:`, e);
+        console.error(
+          `Gagal mem-parsing product_pictures lama untuk produk ${req.params.id}:`,
+          e
+        );
       }
     }
     // Gabungkan gambar yang ada (yang tidak dihapus) dengan gambar baru.
@@ -693,7 +803,10 @@ exports.deleteProduct = async (req, res) => {
           deleteFiles(picturesArray);
         }
       } catch (e) {
-        console.error(`Could not parse product_pictures for product ${req.params.id} on delete`, e);
+        console.error(
+          `Could not parse product_pictures for product ${req.params.id} on delete`,
+          e
+        );
       }
     }
     await product.destroy();
@@ -712,16 +825,43 @@ exports.getAllCategories = async (req, res) => {
   }
 };
 
+exports.getCategoryById = async (req, res) => {
+  try {
+    const category = await Category.findByPk(req.params.id);
+    if (!category) {
+      return res.status(404).json({ message: "Kategori tidak ditemukan" });
+    }
+    res.status(200).json(category);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 exports.addCategory = async (req, res) => {
   const { category_name } = req.body;
   if (!category_name) {
     return res.status(400).json({ message: "Category name is required" });
   }
+
+  let picturePath = null;
+  if (req.files && req.files.pictures && req.files.pictures.length > 0) {
+    // Ambil hanya gambar pertama, agar konsisten dengan logika update
+    picturePath = `/uploads/category/${req.files.pictures[0].filename}`;
+  }
+
   try {
     const category_id = await generateCategoryId();
-    const category = await Category.create({ category_id, category_name });
+    const category = await Category.create({
+      category_id,
+      category_name,
+      category_image: picturePath, // Simpan path string, bukan array
+    });
     res.status(201).json(category);
   } catch (error) {
+    if (picturePath) {
+      // Hapus file yang baru diunggah jika terjadi error
+      deleteFiles([picturePath], "category");
+    }
     res.status(500).json({ message: error.message });
   }
 };
@@ -731,12 +871,31 @@ exports.updateCategory = async (req, res) => {
   if (!category_name) {
     return res.status(400).json({ message: "Category name is required" });
   }
+  let newPicturePath = null;
+  if (req.files && req.files.pictures && req.files.pictures.length > 0) {
+    newPicturePath = `/uploads/category/${req.files.pictures[0].filename}`;
+  }
   try {
     const category = await Category.findByPk(req.params.id);
     if (!category) {
+      if (newPicturePath) {
+        deleteFiles([newPicturePath], "category");
+      }
       return res.status(404).json({ message: "Category not found" });
     }
-    await category.update({ category_name: category_name });
+    const oldPicturePath = category.category_image;
+    const updateData = { category_name, category_image: oldPicturePath };
+
+    // Jika ada gambar baru, update path gambar dan hapus yang lama
+    if (newPicturePath) {
+      updateData.category_image = newPicturePath;
+      if (oldPicturePath) {
+        deleteFiles([oldPicturePath], "category");
+      }
+    }
+
+    await category.update(updateData);
+
     res.status(200).json(category);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -749,6 +908,12 @@ exports.deleteCategory = async (req, res) => {
     if (!category) {
       return res.status(404).json({ message: "Category not found" });
     }
+
+    // Hapus gambar terkait jika ada sebelum menghapus record
+    if (category.category_image) {
+      deleteFiles([category.category_image], "category");
+    }
+
     await category.destroy();
     res.status(200).json({ message: "Category deleted" });
   } catch (error) {
@@ -907,5 +1072,84 @@ exports.getCategoryAttributesOnTiktokShop = async (req, res) => {
       message: "Gagal mengambil atribut kategori dari TikTok Shop.",
       details: error,
     });
+  }
+};
+
+/**
+ * @description Mencatat view untuk produk tertentu.
+ * @route POST /api/products/:id/view
+ * @access Public (atau terautentikasi, sesuai kebutuhan)
+ */
+exports.recordProductView = async (req, res) => {
+  const { id: productId } = req.params;
+
+  // --- START: Pengecekan Admin ---
+  // Cek apakah ada token admin di header. Jika ada dan valid, jangan catat view.
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const adminToken = authHeader.split(" ")[1];
+    try {
+      // Verifikasi token admin
+      const decoded = jwt.verify(adminToken, process.env.JWT_SECRET);
+      if (decoded && decoded.role === "admin") {
+        // Jika token valid dan rolenya adalah admin, hentikan proses.
+        return res.status(200).json({ message: "Admin view is not recorded." });
+      }
+    } catch (err) {
+      // Token tidak valid atau kedaluwarsa. Abaikan dan lanjutkan sebagai user biasa.
+    }
+  }
+  // --- END: Pengecekan Admin ---
+
+  try {
+    // Cek apakah produk ada
+    const product = await Product.findByPk(productId);
+    if (!product) {
+      return res.status(404).json({ message: "Produk tidak ditemukan." });
+    }
+
+    // Opsional: Ambil user ID jika user login
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    let userId = null;
+    if (token && token.email) {
+      const user = await User.findOne({ where: { user_email: token.email } });
+      if (user) userId = user.user_id;
+    }
+
+    // Jika pengguna sudah login, periksa apakah mereka sudah melihat produk ini hari ini.
+    if (userId) {
+      // Tentukan awal hari ini (pukul 00:00:00)
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      const existingView = await ProductViews.findOne({
+        where: {
+          product_id: productId,
+          user_id: userId,
+          viewed_at: {
+            [Op.gte]: startOfToday, // Cek apakah sudah ada view sejak awal hari ini
+          },
+        },
+      });
+
+      // Jika sudah ada view hari ini, jangan catat lagi dan kirim respons sukses.
+      if (existingView) {
+        return res
+          .status(200)
+          .json({ message: "Tampilan sudah dicatat hari ini." });
+      }
+    }
+
+    // Buat catatan view baru jika pengguna anonim, atau jika pengguna yang login belum melihatnya hari ini.
+    await ProductViews.create({
+      product_id: productId,
+      user_id: userId, // Bisa null untuk user anonim
+      viewed_at: new Date(),
+    });
+
+    res.status(200).json({ message: "Tampilan produk berhasil dicatat." });
+  } catch (error) {
+    console.error("Error saat mencatat tampilan produk:", error);
+    res.status(500).json({ message: "Gagal mencatat tampilan produk." });
   }
 };

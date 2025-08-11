@@ -14,13 +14,9 @@ module.exports = (sequelize, DataTypes) => {
     }
   }
   header_slides.init({
-    title: DataTypes.STRING,
-    offer_text: DataTypes.STRING,
-    image_url: DataTypes.TEXT,
-    button1_text: DataTypes.STRING,
-    button1_link: DataTypes.STRING,
-    button2_text: DataTypes.STRING,
-    button2_link: DataTypes.STRING,
+    link: DataTypes.TEXT,
+    image_url_desktop: DataTypes.TEXT,
+    image_url_mobile: DataTypes.TEXT,
     display_order: DataTypes.INTEGER,
     is_active: DataTypes.BOOLEAN
   }, {

@@ -3,7 +3,11 @@ const { getToken } = require("next-auth/jwt");
 const { Op } = require("sequelize");
 
 const getUserIdFromToken = async (req) => {
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+    secureCookie: process.env.NODE_ENV === "production",
+  });
   if (!token) return null;
   const user = await User.findOne({ where: { user_email: token.email } });
   return user ? user.user_id : null;
@@ -80,11 +84,11 @@ exports.sendMessageAdmin = async (req, res) => {
     await conversation.save({ transaction: t });
 
     await t.commit();
-
-    const receiverId = conversation.userId;
-    req.io
-      .to(receiverId.toString())
-      .emit("receive_message", { ...message.get(), conversationId });
+    // Hapus emit ke Socket.IO
+    // const receiverId = conversation.userId;
+    // req.io
+    //   .to(receiverId.toString())
+    //   .emit("receive_message", { ...message.get(), conversationId });
 
     res.status(201).json(message);
   } catch (error) {
@@ -157,12 +161,12 @@ exports.sendMessage = async (req, res) => {
 
     await t.commit();
 
-    // Emit pesan via Socket.IO
-    const receiverId =
-      senderId === conversation.userId ? adminId : conversation.userId;
-    req.io
-      .to(receiverId.toString())
-      .emit("receive_message", { ...message.get(), conversationId });
+    // Hapus emit ke Socket.IO
+    // const receiverId =
+    //   senderId === conversation.userId ? adminId : conversation.userId;
+    // req.io
+    //   .to(receiverId.toString())
+    //   .emit("receive_message", { ...message.get(), conversationId });
 
     res.status(201).json(message);
   } catch (error) {
@@ -172,7 +176,155 @@ exports.sendMessage = async (req, res) => {
   }
 };
 
+/**
+ * [BARU] Endpoint untuk Long Polling
+ * Klien akan memanggil endpoint ini untuk memeriksa pesan baru.
+ */
+exports.getNewMessages = async (req, res) => {
+  try {
+    const userId = await getUserIdFromToken(req);
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const { conversationId, lastMessageId } = req.query;
+
+    if (!conversationId || !lastMessageId) {
+      return res.status(400).json({ message: "Conversation ID dan Last Message ID diperlukan." });
+    }
+
+    // Cari pesan baru yang ID-nya lebih besar dari lastMessageId
+    const newMessages = await Message.findAll({
+      where: {
+        conversationId: conversationId,
+        id: { [Op.gt]: lastMessageId },
+      },
+      include: [
+        {
+          model: User,
+          as: "sender",
+          attributes: ["user_id", "user_name", "user_photo"],
+        },
+      ],
+      order: [["createdAt", "ASC"]],
+    });
+
+    res.status(200).json(newMessages);
+  } catch (error) {
+    console.error("Error polling for new messages:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+exports.getNewMessagesAdmin = async (req, res) => {
+  try {
+    // Admin ID sudah diverifikasi oleh authMiddleware, jadi tidak perlu cek manual.
+    const { conversationId, lastMessageId } = req.query;
+
+    if (!conversationId || !lastMessageId) {
+      return res.status(400).json({ message: "Conversation ID dan Last Message ID diperlukan." });
+    }
+
+    // Cari pesan baru yang ID-nya lebih besar dari lastMessageId
+    const newMessages = await Message.findAll({
+      where: {
+        conversationId: conversationId,
+        id: { [Op.gt]: lastMessageId },
+      },
+      include: [
+        {
+          model: User,
+          as: "sender",
+          attributes: ["user_id", "user_name", "user_photo"],
+        },
+      ],
+      order: [["createdAt", "ASC"]],
+    });
+
+    res.status(200).json(newMessages);
+  } catch (error) {
+    console.error("Error polling for new admin messages:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+exports.getNewMessagesAdmin = async (req, res) => {
+  try {
+    // Admin ID sudah diverifikasi oleh authMiddleware, jadi tidak perlu cek manual.
+    const { conversationId, lastMessageId } = req.query;
+
+    if (!conversationId || !lastMessageId) {
+      return res.status(400).json({ message: "Conversation ID dan Last Message ID diperlukan." });
+    }
+
+    // Cari pesan baru yang ID-nya lebih besar dari lastMessageId
+    const newMessages = await Message.findAll({
+      where: {
+        conversationId: conversationId,
+        id: { [Op.gt]: lastMessageId },
+      },
+      include: [
+        {
+          model: User,
+          as: "sender",
+          attributes: ["user_id", "user_name", "user_photo"],
+        },
+      ],
+      order: [["createdAt", "ASC"]],
+    });
+
+    res.status(200).json(newMessages);
+  } catch (error) {
+    console.error("Error polling for new admin messages:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 // --- ADMIN ---
+
+exports.getConversationUpdatesAdmin = async (req, res) => {
+  try {
+    const { lastFetchTimestamp } = req.query;
+    if (!lastFetchTimestamp) {
+      return res.status(400).json({ message: "lastFetchTimestamp is required." });
+    }
+
+    const unreadCountSubquery = sequelize.literal(`(
+      SELECT COUNT(*)
+      FROM \`Message\`
+      WHERE
+        \`Message\`.\`conversationId\` = \`Conversation\`.\`id\` AND
+        \`Message\`.\`isRead\` = false AND
+        \`Message\`.\`sender_role\` = 'user'
+    )`);
+
+    const updatedConversations = await Conversation.findAll({
+      where: {
+        lastMessageAt: {
+          [Op.gt]: new Date(lastFetchTimestamp),
+        },
+      },
+      attributes: { include: [[unreadCountSubquery, "unreadCount"]] },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["user_id", "user_name", "user_email", "user_photo"],
+        },
+        {
+          model: Message,
+          as: "messages",
+          limit: 1,
+          order: [["createdAt", "DESC"]],
+        },
+      ],
+      order: [["lastMessageAt", "DESC"]],
+    });
+
+    res.status(200).json(updatedConversations);
+  } catch (error) {
+    console.error("Error getting conversation updates for admin:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 exports.getAllConversationsAdmin = async (req, res) => {
   try {

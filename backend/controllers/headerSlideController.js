@@ -34,31 +34,23 @@ exports.getAllHeaderSlides = async (req, res) => {
 // Admin: Create a new header slide
 exports.createHeaderSlide = async (req, res) => {
   try {
-    const {
-      title,
-      offer_text,
-      button1_text,
-      button1_link,
-      button2_text,
-      button2_link,
-      display_order,
-      is_active,
-    } = req.body;
+    const { link, display_order, is_active } = req.body;
+    const { image_desktop, image_mobile } = req.files;
 
-    if (!title || !req.file) {
-      return res.status(400).json({ message: "Judul dan gambar wajib diisi." });
+    if (!image_desktop || !image_mobile) {
+      return res
+        .status(400)
+        .json({ message: "Gambar untuk desktop dan mobile wajib diisi." });
     }
 
-    const image_url = `/uploads/slides/${req.file.filename}`;
+    // Konsisten path
+    const image_url_desktop = `/uploads/slides/image_desktop/${image_desktop[0].filename}`;
+    const image_url_mobile = `/uploads/slides/image_mobile/${image_mobile[0].filename}`;
 
     const newSlide = await HeaderSlide.create({
-      title,
-      offer_text,
-      image_url,
-      button1_text,
-      button1_link,
-      button2_text,
-      button2_link,
+      link: link,
+      image_url_desktop,
+      image_url_mobile,
       display_order: parseInt(display_order, 10) || 0,
       is_active: is_active === "true" || is_active === true,
     });
@@ -76,46 +68,36 @@ exports.createHeaderSlide = async (req, res) => {
 exports.updateHeaderSlide = async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      title,
-      offer_text,
-      button1_text,
-      button1_link,
-      button2_text,
-      button2_link,
-      display_order,
-      is_active,
-    } = req.body;
+    const { link, display_order, is_active } = req.body;
+    const files = req.files;
 
     const slide = await HeaderSlide.findByPk(id);
     if (!slide)
       return res.status(404).json({ message: "Slide tidak ditemukan." });
 
     const updateData = {
-      title,
-      offer_text,
-      button1_text,
-      button1_link,
-      button2_text,
-      button2_link,
-      display_order: parseInt(display_order, 10) || 0,
+      link: link || slide.link,
+      display_order: parseInt(display_order, 10) || slide.display_order,
       is_active: is_active === "true" || is_active === true,
     };
 
-    if (req.file) {
-      if (slide.image_url) {
-        // Perbaikan: Hapus '/' dari awal path untuk membuat path file sistem yang benar
-        const oldImagePath = path.join(
-          __dirname,
-          "..",
-          slide.image_url.substring(1)
-        );
+    // Helper to delete old image
+    const deleteOldImage = (imageUrl) => {
+      if (imageUrl) {
+        const oldImagePath = path.join(__dirname, "..", imageUrl.substring(1));
         if (fs.existsSync(oldImagePath)) fs.unlinkSync(oldImagePath);
       }
-      updateData.image_url = `/uploads/slides/${req.file.filename}`;
+    };
+
+    if (files.image_desktop) {
+      deleteOldImage(slide.image_url_desktop);
+      updateData.image_url_desktop = `/uploads/slides/image_desktop/${files.image_desktop[0].filename}`;
+    }
+    if (files.image_mobile) {
+      deleteOldImage(slide.image_url_mobile);
+      updateData.image_url_mobile = `/uploads/slides/image_mobile/${files.image_mobile[0].filename}`;
     }
 
-    // Lakukan update. Jika tidak ada file baru, image_url tidak akan diubah.
     await slide.update(updateData);
 
     res.status(200).json({ message: "Slide berhasil diperbarui.", slide });
@@ -133,15 +115,16 @@ exports.deleteHeaderSlide = async (req, res) => {
     if (!slide)
       return res.status(404).json({ message: "Slide tidak ditemukan." });
 
-    if (slide.image_url) {
-      // Perbaikan: Hapus '/' dari awal path
-      const imagePath = path.join(
-        __dirname,
-        "..",
-        slide.image_url.substring(1)
-      );
-      if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
-    }
+    const deleteImage = (imageUrl) => {
+      if (imageUrl) {
+        const imagePath = path.join(__dirname, "..", imageUrl.substring(1));
+        if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+      }
+    };
+
+    deleteImage(slide.image_url_desktop);
+    deleteImage(slide.image_url_mobile);
+
     await slide.destroy();
     res.status(200).json({ message: "Slide berhasil dihapus." });
   } catch (error) {

@@ -21,9 +21,8 @@ const paymentMethodRoutes = require("./routes/paymentMethodRoutes");
 const contentRoutes = require("./routes/contentRoutes");
 const featuredProductRoutes = require("./routes/featuredProductRoutes");
 const headerSlideRoutes = require("./routes/headerSlideRoutes");
-const bannerRoutes = require("./routes/promoBannerRoutes");
 const loginBannerRoutes = require("./routes/loginBannerRoutes");
-
+const analyticsRoutes = require("./routes/analyticsRoutes");
 
 // Cron job
 const {
@@ -32,44 +31,12 @@ const {
 } = require("./cron/scheduler");
 const tiktokRoutes = require("./routes/tiktokRoutes");
 
-const { Server } = require("socket.io");
-
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"],
-  },
-});
-
-// Listener utama untuk koneksi Socket.IO
-io.on("connection", (socket) => {
-  console.log(`Socket connected: ${socket.id}`);
-
-  socket.on("join_room", (roomId) => {
-    if (roomId) {
-      socket.join(roomId.toString());
-      console.log(`Socket ${socket.id} joined room: ${roomId}`);
-    } else {
-      console.warn(`Socket ${socket.id} tried to join an invalid (null) room.`);
-    }
-  });
-
-  socket.on("disconnect", () => {
-    console.log(`Socket disconnected: ${socket.id}`);
-  });
-});
-
-// Middleware untuk membuat `io` bisa diakses di controller
-app.use((req, res, next) => {
-  req.io = io;
-  next();
-});
 
 app.use(
   cors({
-    origin: "http://192.168.10.33:3000",
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
@@ -81,30 +48,30 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-app.get("/api", (req, res) => {
+app.get("/kamo", (req, res) => {
   res.status(200).send("OK");
 });
 
-app.use("/api/auth", authRoutes);
-app.use("/api/products", productRoutes);
-app.use("/api/wishlist", wishlistRoutes);
-app.use("/api/cart", cartRoutes);
-app.use("/api/orders", orderRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/chat", chatRoutes);
-app.use("/api/reviews", reviewRoutes);
+app.use("/kamo/auth", authRoutes);
+app.use("/kamo/products", productRoutes);
+app.use("/kamo/wishlist", wishlistRoutes);
+app.use("/kamo/cart", cartRoutes);
+app.use("/kamo/orders", orderRoutes);
+app.use("/kamo/dashboard", dashboardRoutes);
+app.use("/kamo/chat", chatRoutes);
+app.use("/kamo/reviews", reviewRoutes);
 
-app.use("/api/xendit", paymentRoutes);
-app.use("/api/destinations", destinationRoutes);
-app.use("/api/shipping", shippingRoutes);
-app.use("/api/settings", settingRoutes);
-app.use("/api/payment-methods", paymentMethodRoutes);
-app.use("/api/content", contentRoutes);
-app.use("/api/featured-products", featuredProductRoutes);
-app.use("/api/header-slides", headerSlideRoutes);
-app.use("/api/banners", bannerRoutes);
-app.use("/api/login-banners", loginBannerRoutes);
-app.use("/api/tiktok", tiktokRoutes);
+app.use("/kamo/xendit", paymentRoutes);
+app.use("/kamo/destinations", destinationRoutes);
+app.use("/kamo/shipping", shippingRoutes);
+app.use("/kamo/settings", settingRoutes);
+app.use("/kamo/payment-methods", paymentMethodRoutes);
+app.use("/kamo/content", contentRoutes);
+app.use("/kamo/featured-products", featuredProductRoutes);
+app.use("/kamo/header-slides", headerSlideRoutes);
+app.use("/kamo/login-banners", loginBannerRoutes);
+app.use("/kamo/tiktok", tiktokRoutes);
+app.use("/kamo/analytics", analyticsRoutes);
 
 const PORT = process.env.PORT || 8000;
 

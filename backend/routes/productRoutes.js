@@ -4,12 +4,14 @@ const authMiddleware = require("../middlewares/authMiddleware");
 const upload = require("../middlewares/fileMiddleware");
 const {
   getAllProducts,
+  getAllProductsWithoutOutOfStock,
   getProductById,
   createProduct,
   updateProduct,
   updateProductStatus,
   deleteProduct,
   getAllCategories,
+  getCategoryById,
   addCategory,
   updateCategory,
   deleteCategory,
@@ -19,9 +21,26 @@ const {
   activateTiktokProduct,
   deactivateTiktokProduct,
   partialUpdateTiktokProduct,
+  getProductStatusTiktok,
+  recordProductView,
 } = require("../controllers/productController");
+const multer = require("multer");
+const fs = require("fs");
+
+const categoryStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dest = "uploads/category";
+    fs.mkdirSync(dest, { recursive: true }); // Pastikan direktori ada
+    cb(null, dest);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname.replace(/\s/g, "_")}`);
+  },
+});
+const uploadCategory = multer({ storage: categoryStorage });
 
 // TikTok Routes
+router.get("/tiktok/:id/status", authMiddleware, getProductStatusTiktok);
 router.post("/tiktok/activate", authMiddleware, activateTiktokProduct);
 router.post("/tiktok/deactivate", authMiddleware, deactivateTiktokProduct);
 
@@ -31,16 +50,27 @@ router.get(
   getCategoryAttributesOnTiktokShop
 );
 
-
 // Category Routes
 router.get("/categories", getAllCategories);
 router.get("/categories/:id/products", getProductsByCategory);
-router.post("/categories", authMiddleware, addCategory);
-router.put("/categories/:id", authMiddleware, updateCategory);
+router.post(
+  "/categories",
+  authMiddleware,
+  uploadCategory.fields([{ name: "pictures", maxCount: 1 }]),
+  addCategory
+);
+router.get("/categories/:id", getCategoryById);
+router.put(
+  "/categories/:id",
+  authMiddleware,
+  uploadCategory.fields([{ name: "pictures", maxCount: 1 }]),
+  updateCategory
+);
 router.delete("/categories/:id", authMiddleware, deleteCategory);
 
 // Product Routes
 router.get("/", getAllProducts);
+router.get("/all-products", getAllProductsWithoutOutOfStock);
 router.post(
   "/",
   authMiddleware,
@@ -55,6 +85,7 @@ router.put(
   upload.fields([{ name: "pictures" }]),
   updateProduct
 );
+router.post("/:id/view", recordProductView); // Route baru untuk mencatat view
 router.delete("/:id", authMiddleware, deleteProduct);
 
 module.exports = router;

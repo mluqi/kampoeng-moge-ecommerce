@@ -19,6 +19,10 @@ module.exports = (sequelize, DataTypes) => {
         as: "reviews",
       });
       Product.hasMany(models.OrderItem, { foreignKey: "product_id", as: "product" });
+      Product.hasMany(models.ProductViews, {
+        foreignKey: "product_id",
+        as: "views",
+      });
     }
   }
   Product.init(
@@ -62,6 +66,11 @@ module.exports = (sequelize, DataTypes) => {
       product_review_count: {
         type: DataTypes.INTEGER,
         allowNull: true,
+        defaultValue: 0,
+      },
+      product_sold: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
         defaultValue: 0,
       },
     },

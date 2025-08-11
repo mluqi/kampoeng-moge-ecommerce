@@ -26,6 +26,7 @@ const createInvoice = async (data) => {
     const response = await xenditClient.post("/v2/invoices", data);
     return response.data;
   } catch (error) {
+    console.error("Error creating invoice:", error);
     throw error.response?.data || error;
   }
 };

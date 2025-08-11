@@ -18,6 +18,49 @@ const {
 } = require("../services/xendit");
 const { syncStockToTiktok } = require("./productController");
 
+// Helper function to safely parse JSON fields from a product object
+const parseProductJSONFields = (productData) => {
+  // If it's a Sequelize instance, get the plain object. Otherwise, clone it to avoid mutation.
+  const product = productData.get
+    ? productData.get({ plain: true })
+    : { ...productData };
+
+  const fieldsToParse = [
+    { key: "product_pictures", default: [] },
+    { key: "product_dimensions", default: {} },
+    { key: "product_attributes_tiktok", default: [] },
+  ];
+
+  for (const field of fieldsToParse) {
+    const value = product[field.key];
+    if (value && typeof value === "string") {
+      try {
+        product[field.key] = JSON.parse(value);
+      } catch (e) {
+        product[field.key] = field.default; // Fallback to default on parsing error
+      }
+    } else if (!value) {
+      product[field.key] = field.default; // Fallback to default if null/undefined
+    }
+  }
+  return product;
+};
+
+// Helper to parse products within a single order object
+const parseOrder = (orderInstance) => {
+  if (!orderInstance) return null;
+  const order = orderInstance.toJSON();
+  if (order.items && Array.isArray(order.items)) {
+    order.items = order.items.map((item) => {
+      if (item.product) {
+        item.product = parseProductJSONFields(item.product);
+      }
+      return item;
+    });
+  }
+  return order;
+};
+
 const getUserFromToken = async (req) => {
   const token = await getToken({
     req,
@@ -85,7 +128,9 @@ exports.getOrders = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    res.status(200).json(orders);
+    const parsedOrders = orders.map(parseOrder);
+
+    res.status(200).json(parsedOrders);
   } catch (error) {
     console.error("Error getting orders:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -101,6 +146,14 @@ exports.createOrder = async (req, res) => {
     if (!user) {
       await t.rollback();
       return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // Validasi nomor telepon pengguna
+    if (!user.user_phone) {
+      await t.rollback();
+      return res.status(400).json({
+        message: "Nomor telepon wajib diisi di profil Anda untuk membuat pesanan.",
+      });
     }
 
     const { items, shippingAddress, shippingMethod, paymentMethod } = req.body;
@@ -301,8 +354,7 @@ exports.createOrder = async (req, res) => {
         process.env.XENDIT_SUCCESS_URL ||
         `${process.env.FRONTEND_URL}/order-placed`,
       failure_redirect_url:
-        process.env.XENDIT_FAILURE_URL ||
-        `${process.env.FRONTEND_URL}/checkout?payment_status=failed`,
+        process.env.XENDIT_FAILURE_URL || `${process.env.FRONTEND_URL}/payment-failed`,
     };
     const invoice = await createInvoice(invoiceData);
     paymentDetails = {
@@ -408,7 +460,7 @@ exports.getOrderById = async (req, res) => {
       return res.status(404).json({ message: "Pesanan tidak ditemukan." });
     }
 
-    res.status(200).json(order);
+    res.status(200).json(parseOrder(order));
   } catch (error) {
     console.error("Error getting order by ID:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -460,9 +512,10 @@ exports.cancelOrder = async (req, res) => {
     await order.save({ transaction: t });
 
     await t.commit();
-    res
-      .status(200)
-      .json({ message: "Permintaan pembatalan telah diajukan.", order });
+    res.status(200).json({
+      message: "Permintaan pembatalan telah diajukan.",
+      order: parseOrder(order),
+    });
   } catch (error) {
     await t.rollback();
     console.error("Error requesting order cancellation:", error);
@@ -492,8 +545,10 @@ exports.getAllOrdersAdmin = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
+    const parsedRows = rows.map(parseOrder);
+
     res.status(200).json({
-      data: rows,
+      data: parsedRows,
       totalPages: Math.ceil(count / limitNum),
       currentPage: pageNum,
     });
@@ -525,7 +580,7 @@ exports.getOrderByIdAdmin = async (req, res) => {
     });
     if (!order)
       return res.status(404).json({ message: "Pesanan tidak ditemukan." });
-    res.status(200).json(order);
+    res.status(200).json(parseOrder(order));
   } catch (error) {
     console.error("Error getting order by ID for admin:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -533,17 +588,36 @@ exports.getOrderByIdAdmin = async (req, res) => {
 };
 
 exports.updateOrderStatus = async (req, res) => {
+  const t = await sequelize.transaction();
   const { status } = req.body;
   if (!status) return res.status(400).json({ message: "Status is required." });
 
   try {
-    const order = await Order.findOne({ where: { order_id: req.params.id } });
+    const order = await Order.findOne({
+      where: { order_id: req.params.id },
+      include: [{ model: OrderItem, as: "items" }], // Sertakan item untuk update product_sold
+      transaction: t,
+    });
+
     if (!order) {
+      await t.rollback();
       return res.status(404).json({ message: "Pesanan tidak ditemukan." });
     }
 
+    const oldStatus = order.status;
     order.status = status;
-    await order.save();
+    await order.save({ transaction: t });
+
+    // Jika status berubah menjadi 'completed' dari status lain, update jumlah terjual
+    if (status === "completed" && oldStatus !== "completed") {
+      for (const item of order.items) {
+        await Product.increment('product_sold', {
+          by: item.quantity,
+          where: { product_id: item.product_id },
+          transaction: t,
+        });
+      }
+    }
 
     // Setelah menyimpan, ambil kembali data order lengkap dengan relasinya
     const updatedOrderWithItems = await Order.findOne({
@@ -553,17 +627,21 @@ exports.updateOrderStatus = async (req, res) => {
         {
           model: OrderItem,
           as: "items",
-          include: [{ model: Product, as: "product" }],
+          include: [{ model: Product, as: "product" }]
         },
       ],
+      transaction: t,
     });
+
+    await t.commit();
 
     res.status(200).json({
       message: "Status pesanan berhasil diperbarui.",
-      order: updatedOrderWithItems,
+      order: parseOrder(updatedOrderWithItems),
     });
   } catch (error) {
     console.error("Error updating order status:", error);
+    await t.rollback();
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -623,7 +701,7 @@ exports.approveCancelOrder = async (req, res) => {
       syncStockToTiktok(p.productId, p.newStock);
     }
 
-    res.status(200).json({ message: "Pesanan berhasil dibatalkan.", order: order.toJSON() });
+    res.status(200).json({ message: "Pesanan berhasil dibatalkan.", order: parseOrder(order) });
   } catch (error) {
     await t.rollback();
     console.error("Error approving cancellation:", error);
@@ -652,7 +730,7 @@ exports.rejectCancelOrder = async (req, res) => {
 
     res.status(200).json({
       message: "Permintaan pembatalan pesanan telah ditolak.",
-      order,
+      order: parseOrder(order),
     });
   } catch (error) {
     console.error("Error rejecting cancellation request:", error);

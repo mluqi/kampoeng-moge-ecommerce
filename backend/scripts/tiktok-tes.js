@@ -9,7 +9,7 @@ const {
   getCategoryAttributes,
   refreshToken,
   searchProducts,
-} = require("./services/tiktokShop");
+} = require("../services/tiktokShop");
 
 // 1. Definisikan semua path gambar dalam sebuah array
 const IMAGE_PATHS = [
