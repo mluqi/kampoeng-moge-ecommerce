@@ -66,10 +66,20 @@ const ProductDetailEdit = () => {
   const [tiktokProductAttributes, setTiktokProductAttributes] = useState([]);
   const [initialTiktokAttributes, setInitialTiktokAttributes] = useState({});
 
+  // Format harga dengan titik ribuan saat input, tapi kirim ke backend tetap angka
   const formatNumber = (value) => {
-    const numericValue = value.replace(/\D/g, "");
+    const numericValue = String(value).replace(/\D/g, "");
     if (!numericValue) return "";
     return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  // Handler khusus untuk input harga agar selalu terformat
+  const handlePriceChange = (e) => {
+    const raw = e.target.value.replace(/\D/g, "");
+    setForm((prev) => ({
+      ...prev,
+      price: formatNumber(raw),
+    }));
   };
 
   useEffect(() => {
@@ -133,7 +143,7 @@ const ProductDetailEdit = () => {
           name: fetched.product_name || "",
           description: fetched.product_description || "",
           sku: fetched.product_sku || "",
-          price: fetched.product_price || "",
+          price: formatNumber(fetched.product_price),
           stock: fetched.product_stock || "",
           condition: fetched.product_condition || "Baru",
           status: fetched.product_status || "active",
@@ -270,7 +280,8 @@ const ProductDetailEdit = () => {
     formData.append("name", form.name);
     formData.append("description", form.description);
     formData.append("sku", form.sku);
-    formData.append("price", form.price);
+    // Kirim harga ke backend sebagai angka tanpa titik
+    formData.append("price", form.price.replace(/\./g, ""));
     formData.append("stock", form.stock);
     formData.append("condition", form.condition);
     formData.append("status", form.status);
@@ -502,7 +513,7 @@ const ProductDetailEdit = () => {
                   </div>
 
                   {/* --- Bagian Integrasi TikTok --- */}
-                  {product.product_tiktok_id && (
+                  {/* {product.product_tiktok_id && (
                     <div className="bg-gray-50 rounded-lg p-5">
                       <h3 className="font-medium text-gray-700 mb-3">
                         Integrasi TikTok Shop
@@ -525,7 +536,7 @@ const ProductDetailEdit = () => {
                         </div>
                       </div>
                     </div>
-                  )}
+                  )} */}
 
                   <div>
                     <h3 className="font-medium text-gray-700 mb-2">
@@ -798,12 +809,11 @@ const ProductDetailEdit = () => {
                       <div className="relative">
                         <span className="absolute left-3 top-2.5">Rp</span>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
                           value={form.price}
-                          onChange={(e) =>
-                            setForm({ ...form, price: e.target.value })
-                          }
+                          onChange={handlePriceChange}
                           required
                         />
                       </div>

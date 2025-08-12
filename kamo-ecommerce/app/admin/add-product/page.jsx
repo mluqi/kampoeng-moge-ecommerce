@@ -75,9 +75,15 @@ const AddProduct = () => {
   );
 
   const formatNumber = (value) => {
-    const numericValue = value.replace(/\D/g, "");
+    const numericValue = String(value).replace(/\D/g, "");
     if (!numericValue) return "";
     return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  // Handler khusus untuk input harga agar selalu terformat
+  const handlePriceChange = (e) => {
+    const raw = e.target.value.replace(/\D/g, "");
+    setPrice(formatNumber(raw));
   };
 
   // Konfigurasi modul untuk toolbar ReactQuill
@@ -115,7 +121,7 @@ const AddProduct = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const numericPrice = price.replace(/\./g, '');
+    const numericPrice = price.replace(/\./g, "");
 
     // --- START: Frontend Validation ---
     if (name.length < 25 || name.length > 255) {
@@ -406,10 +412,7 @@ const AddProduct = () => {
                   type="text"
                   placeholder="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
-                  onChange={(e) => {
-                    const formatted = formatNumber(e.target.value);
-                    setPrice(formatted);
-                  }}
+                  onChange={handlePriceChange}
                   value={price}
                   required
                 />

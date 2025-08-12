@@ -33,6 +33,11 @@ const nextConfig = {
         port: "8000",
         pathname: "**",
       },
+      {
+        protocol: "https",
+        hostname: "p16-oec-va.ibyteimg.com",
+        pathname: "**",
+      },
     ],
   },
 };
