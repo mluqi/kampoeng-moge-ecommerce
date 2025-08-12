@@ -10,7 +10,6 @@ const {
   TIKPED_APP_KEY: APP_KEY,
   TIKPED_APP_SECRET: APP_SECRET,
   TIKPED_SHOP_CIPHER: SHOP_CIPHER,
-  // TIKPED_ACCESS_TOKEN: ACCESS_TOKEN,
   TIKPED_WAREHOUSE_ID: WAREHOUSE_ID,
 } = process.env;
 
@@ -131,8 +130,7 @@ const generateSign = (url, params, body, contentType, appSecret) => {
 
   if (
     contentType !== "multipart/form-data" &&
-    body &&
-    Object.keys(body).length
+    body
   ) {
     signString += JSON.stringify(body);
   }
@@ -451,6 +449,36 @@ const searchProducts = async (searchParams = {}) => {
   return postToTiktok(path, body, queryParams);
 };
 
+/**
+ * Searches for orders on TikTok Shop.
+ * @param {object} [body={}] - The request body for filtering orders.
+ * @param {object} [queryParams={}] - Query parameters like page_size, page_token.
+ * @returns {Promise<Object>} TikTok API response.
+ */
+const searchOrders = async (body = {}, queryParams = {}) => {
+  const path = "/order/202309/orders/search";
+  const defaultQueryParams = {
+    version: "202309",
+  };
+  const finalQueryParams = { ...defaultQueryParams, ...queryParams };
+  return postToTiktok(path, body, finalQueryParams);
+};
+
+/**
+ * Gets details for specific orders from TikTok Shop.
+ * @param {string[]} orderIds - An array of TikTok order IDs.
+ * @returns {Promise<Object>} TikTok API response.
+ */
+const getOrderDetails = async (orderIds) => {
+  const path = "/order/202309/orders";
+  const queryParams = {
+    // API v202309 expects a comma-separated string for multiple IDs.
+    ids: orderIds.join(','),
+    version: "202309",
+  };
+  return getFromTiktok(path, queryParams);
+};
+
 module.exports = {
   createProduct,
   uploadImage,
@@ -466,4 +494,6 @@ module.exports = {
   getSingleProductDetails,
   refreshToken,
   searchProducts,
+  searchOrders,
+  getOrderDetails,
 };

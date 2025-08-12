@@ -17,6 +17,10 @@ const {
   getAllInvoices,
 } = require("../services/xendit");
 const { syncStockToTiktok } = require("./productController");
+const {
+  searchOrders: searchTiktokOrders,
+  getOrderDetails: getTiktokOrderDetails,
+} = require("../services/tiktokShop");
 
 // Helper function to safely parse JSON fields from a product object
 const parseProductJSONFields = (productData) => {
@@ -137,6 +141,60 @@ exports.getOrders = async (req, res) => {
   }
 };
 
+exports.getTiktokOrders = async (req, res) => {
+  try {
+    // page_size and page_token are query parameters
+    const { page_size = 10, page_token } = req.query;
+    // other filters are in the body
+    const body = req.body || {};
+
+    const queryParams = { page_size };
+    if (page_token) {
+      queryParams.page_token = page_token;
+    }
+
+    const tiktokResponse = await searchTiktokOrders(body, queryParams);
+
+    res.status(200).json(tiktokResponse);
+  } catch (error) {
+    console.error("Error fetching TikTok Shop orders:", error);
+    const statusCode =
+      error.code && String(error.code).startsWith("4") ? 400 : 500;
+    res.status(statusCode).json({
+      message: "Gagal mengambil pesanan dari TikTok Shop.",
+      details: error,
+    });
+  }
+};
+
+exports.getTiktokOrderById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ message: "Order ID is required." });
+    }
+
+    // The TikTok API expects an array of IDs, even for a single lookup
+    const tiktokResponse = await getTiktokOrderDetails([id]);
+
+    // The API returns an array of orders, even for a single ID lookup.
+    // We'll take the first one.
+    if (tiktokResponse?.data?.orders && tiktokResponse.data.orders.length > 0) {
+      res.status(200).json(tiktokResponse.data.orders[0]);
+    } else {
+      res.status(404).json({ message: "Order not found on TikTok Shop." });
+    }
+  } catch (error) {
+    console.error("Error fetching TikTok Shop order details:", error);
+    const statusCode =
+      error.code && String(error.code).startsWith("4") ? 400 : 500;
+    res.status(statusCode).json({
+      message: "Gagal mengambil detail pesanan dari TikTok Shop.",
+      details: error,
+    });
+  }
+};
+
 // tambahkan fee 1% 1/100 x total_barang
 exports.createOrder = async (req, res) => {
   const t = await sequelize.transaction();
@@ -152,7 +210,8 @@ exports.createOrder = async (req, res) => {
     if (!user.user_phone) {
       await t.rollback();
       return res.status(400).json({
-        message: "Nomor telepon wajib diisi di profil Anda untuk membuat pesanan.",
+        message:
+          "Nomor telepon wajib diisi di profil Anda untuk membuat pesanan.",
       });
     }
 
@@ -314,15 +373,23 @@ exports.createOrder = async (req, res) => {
           },
         ],
       },
-      items: orderItemsData.map((item) => ({
-        name: item.product_name,
-        quantity: item.quantity,
-        price: item.price,
-      })).concat(shippingCost > 0 ? [{
-        name: "Biaya Pengiriman",
-        quantity: 1,
-        price: shippingCost,
-      }] : []),
+      items: orderItemsData
+        .map((item) => ({
+          name: item.product_name,
+          quantity: item.quantity,
+          price: item.price,
+        }))
+        .concat(
+          shippingCost > 0
+            ? [
+                {
+                  name: "Biaya Pengiriman",
+                  quantity: 1,
+                  price: shippingCost,
+                },
+              ]
+            : []
+        ),
 
       fees: fees,
       payment_methods: [paymentMethodDetails.wlpay_code],
@@ -354,7 +421,8 @@ exports.createOrder = async (req, res) => {
         process.env.XENDIT_SUCCESS_URL ||
         `${process.env.FRONTEND_URL}/order-placed`,
       failure_redirect_url:
-        process.env.XENDIT_FAILURE_URL || `${process.env.FRONTEND_URL}/payment-failed`,
+        process.env.XENDIT_FAILURE_URL ||
+        `${process.env.FRONTEND_URL}/payment-failed`,
     };
     const invoice = await createInvoice(invoiceData);
     paymentDetails = {
@@ -611,7 +679,7 @@ exports.updateOrderStatus = async (req, res) => {
     // Jika status berubah menjadi 'completed' dari status lain, update jumlah terjual
     if (status === "completed" && oldStatus !== "completed") {
       for (const item of order.items) {
-        await Product.increment('product_sold', {
+        await Product.increment("product_sold", {
           by: item.quantity,
           where: { product_id: item.product_id },
           transaction: t,
@@ -627,7 +695,7 @@ exports.updateOrderStatus = async (req, res) => {
         {
           model: OrderItem,
           as: "items",
-          include: [{ model: Product, as: "product" }]
+          include: [{ model: Product, as: "product" }],
         },
       ],
       transaction: t,
@@ -701,7 +769,12 @@ exports.approveCancelOrder = async (req, res) => {
       syncStockToTiktok(p.productId, p.newStock);
     }
 
-    res.status(200).json({ message: "Pesanan berhasil dibatalkan.", order: parseOrder(order) });
+    res
+      .status(200)
+      .json({
+        message: "Pesanan berhasil dibatalkan.",
+        order: parseOrder(order),
+      });
   } catch (error) {
     await t.rollback();
     console.error("Error approving cancellation:", error);

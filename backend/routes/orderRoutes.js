@@ -11,6 +11,8 @@ const {
   updateOrderStatus,
   approveCancelOrder,
   rejectCancelOrder,
+  getTiktokOrders,
+  getTiktokOrderById,
 } = require("../controllers/orderController");
 
 // --- USER ROUTES ---
@@ -26,5 +28,9 @@ router.put("/admin/:id/status", authMiddleware, updateOrderStatus);
 
 router.put("/admin/:id/approve-cancel", authMiddleware, approveCancelOrder);
 router.put("/admin/:id/reject-cancel", authMiddleware, rejectCancelOrder);
+
+// --- ADMIN TIKTOK ROUTES ---
+router.post("/admin/tiktok/search", authMiddleware, getTiktokOrders);
+router.get("/admin/tiktok/:id", authMiddleware, getTiktokOrderById);
 
 module.exports = router;
