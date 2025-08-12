@@ -122,7 +122,7 @@ const ProductCard = ({ product }) => {
 
       {/* Product Info */}
       <div className="p-1 flex flex-col flex-grow">
-        <h3 className="font-medium text-gray-900 mb-1 line-clamp-2 h-[2.8em]">
+        <h3 className="text-md lg:text-md font-medium text-gray-900 mb-1 line-clamp-2 h-[2.8em]">
           {product.product_name}
         </h3>
 
@@ -136,7 +136,7 @@ const ProductCard = ({ product }) => {
 
         {/* Price */}
         <div className="flex items-end justify-between mt-auto">
-          <p className="text-lg font-bold text-gray-900">
+          <p className="text-md lg:text-lg font-bold text-gray-900">
             Rp {product.product_price?.toLocaleString("id-ID")}
           </p>
 

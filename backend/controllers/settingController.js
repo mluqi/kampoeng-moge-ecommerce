@@ -31,7 +31,7 @@ exports.getSettingByKey = async (req, res) => {
     const setting = await Setting.findByPk(key);
 
     if (!setting) {
-      return res.status(404).json({ message: 'Setting tidak ditemukan.' });
+      return res.status(404).json({ message: "Setting tidak ditemukan." });
     }
     res.status(200).json(setting);
   } catch (error) {
@@ -39,19 +39,35 @@ exports.getSettingByKey = async (req, res) => {
   }
 };
 
-// Memperbarui beberapa pengaturan sekaligus
 exports.updateSettings = async (req, res) => {
-  // Body request diharapkan berupa array: [{ key: 'store_name', value: 'Toko Baru' }, ...]
-  const settingsToUpdate = req.body;
+  // Ambil data settings dari form-data (req.body.settings) atau langsung dari req.body
+  let settingsToUpdate = req.body.settings || req.body;
+  if (typeof settingsToUpdate === "string") {
+    try {
+      settingsToUpdate = JSON.parse(settingsToUpdate);
+    } catch (e) {
+      return res.status(400).json({ message: "Input tidak valid." });
+    }
+  }
+
   if (!Array.isArray(settingsToUpdate)) {
     return res.status(400).json({ message: "Input harus berupa array." });
   }
 
   try {
+    if (req.file) {
+      const logoUrl = `/uploads/settings/${req.file.filename}`;
+      await Setting.upsert({
+        key: "logo_url",
+        value: logoUrl,
+        group: "footer",
+      });
+    }
+
     for (const setting of settingsToUpdate) {
       await Setting.upsert({
         key: setting.key,
-        value: String(setting.value), // Pastikan value selalu string
+        value: String(setting.value),
         group: setting.group,
       });
     }
@@ -72,9 +88,13 @@ exports.updateActiveShippingServices = async (req, res) => {
       group: "shipping",
     });
 
-    res.status(200).json({ message: "Layanan pengiriman JNE berhasil diperbarui." });
+    res
+      .status(200)
+      .json({ message: "Layanan pengiriman JNE berhasil diperbarui." });
   } catch (error) {
     console.error("Error updating active shipping services:", error);
-    res.status(500).json({ message: "Gagal memperbarui layanan pengiriman JNE." });
+    res
+      .status(500)
+      .json({ message: "Gagal memperbarui layanan pengiriman JNE." });
   }
 };

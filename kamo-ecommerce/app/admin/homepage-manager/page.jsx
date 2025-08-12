@@ -185,10 +185,15 @@ const HomepageManagerPage = () => {
 
   const renderImageInput = (name, label, preview, onChange, description) => (
     <div>
-      <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">
+      <label
+        htmlFor={name}
+        className="block text-sm font-medium text-gray-700 mb-1"
+      >
         {label}
       </label>
-      {description && <p className="text-xs text-gray-500 mb-2">{description}</p>}
+      {description && (
+        <p className="text-xs text-gray-500 mb-2">{description}</p>
+      )}
       <div className="flex items-center gap-4">
         {preview && (
           <Image
@@ -472,7 +477,7 @@ const HomepageManagerPage = () => {
                     ...p,
                     desktop: URL.createObjectURL(e.target.files[0]),
                   })),
-                "Rekomendasi ukuran: 1920x720 pixel."
+                "Rekomendasi ukuran: 1424x328 pixel."
               )}
               {renderImageInput(
                 "image_mobile",
@@ -484,7 +489,7 @@ const HomepageManagerPage = () => {
                     ...p,
                     mobile: URL.createObjectURL(e.target.files[0]),
                   })),
-                "Rekomendasi ukuran: 800x800 pixel."
+                "Rekomendasi ukuran: 362x504 pixel."
               )}
               <div className="flex justify-end gap-3 pt-4">
                 <button

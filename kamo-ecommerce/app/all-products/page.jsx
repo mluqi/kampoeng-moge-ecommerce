@@ -98,9 +98,28 @@ const AllProducts = () => {
         {/* Daftar Produk */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 mt-10 pb-8 w-full">
           {loading ? (
-            <div className="col-span-full">
-              <Loading />
-            </div>
+            [...Array(PRODUCTS_PER_PAGE)].map((_, i) => (
+              <div key={i} className="w-full">
+                <div
+                  className="aspect-square bg-accent/20 rounded-xl animate-pulse"
+                  style={{ animationDuration: "1.2s" }}
+                />
+                <div className="mt-3 space-y-3">
+                  <div
+                    className="h-4 bg-accent/20 rounded w-full animate-pulse"
+                    style={{ animationDuration: "1.2s" }}
+                  />
+                  <div
+                    className="h-4 bg-accent/20 rounded w-2/3 animate-pulse"
+                    style={{ animationDuration: "1.2s" }}
+                  />
+                  <div
+                    className="h-5 bg-accent/20 rounded w-1/2 animate-pulse"
+                    style={{ animationDuration: "1.2s" }}
+                  />
+                </div>
+              </div>
+            ))
           ) : displayedProducts && displayedProducts.length > 0 ? (
             displayedProducts.map((product) => (
               <ProductCard key={product.product_id} product={product} />

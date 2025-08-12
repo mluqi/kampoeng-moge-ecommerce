@@ -16,7 +16,8 @@ import {
   FaEdit,
   FaStar,
   FaImages,
-  FaChartLine
+  FaChartLine,
+  FaChartArea,
 } from "react-icons/fa";
 import { BiSolidBookContent } from "react-icons/bi";
 
@@ -51,9 +52,14 @@ const SideBar = () => {
           icon: <FaListAlt />,
         },
         {
-          name: "Analytics",
+          name: "Analytics Product Views",
           path: "/admin/analytics",
           icon: <FaChartLine />,
+        },
+        {
+          name: "Analytics Cart",
+          path: "/admin/analytics-cart",
+          icon: <FaChartArea />,
         },
         { name: "Category", path: "/admin/category", icon: <FaBookmark /> },
         {

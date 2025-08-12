@@ -19,12 +19,16 @@ const Navbar = () => {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
   const [loadingSearch, setLoadingSearch] = useState(false);
   const { user, profile, userLogout } = useUserAuth();
   const { admin, logoutAdmin } = useAuth();
   const { cartCount } = useCart();
+  // State untuk settings logo
+  const [settings, setSettings] = useState(null);
+  const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
   // Debounce untuk menunda pencarian API
   useEffect(() => {
@@ -61,6 +65,19 @@ const Navbar = () => {
     }
   };
 
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await api.get("/settings");
+        setSettings(res.data);
+      } catch (error) {
+        // Tidak perlu error toast di navbar
+        console.error("Gagal memuat pengaturan navbar:", error);
+      }
+    };
+    fetchSettings();
+  }, []);
+
   return (
     <nav className="sticky top-0 z-50 flex items-center justify-between px-8 md:px-8 lg:px-32 py-4 bg-white text-gray-700 shadow-sm relative">
       {/* Logo */}
@@ -70,9 +87,15 @@ const Navbar = () => {
           router.push("/");
           setMenuOpen(false);
         }}
-        src={assets.logo_accent}
+        src={
+          settings?.footer?.logo_url
+            ? `${baseUrl}${settings.footer.logo_url}`
+            : assets.logo_accent
+        }
         alt="logo"
         priority
+        width={144}
+        height={48}
       />
 
       {/* Desktop Navigation Links */}
@@ -220,7 +243,7 @@ const Navbar = () => {
       <div className="flex md:hidden items-center gap-4">
         {/* Profile button only on mobile (hidden on iPad) */}
         {user && (
-          <Link href="/profile" className="md:hidden">
+          <Link href="/profile" className="md:hidden hidden">
             <Image
               src={profile?.user_photo || user.image || assets.user_icon}
               alt="Profil"
@@ -230,6 +253,86 @@ const Navbar = () => {
             />
           </Link>
         )}
+
+        {/* Toggle search icon */}
+        <div className="flex items-center gap-2">
+          <form
+            onSubmit={handleSearchSubmit}
+            className="flex items-center"
+            style={{ minWidth: 0 }}
+          >
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Cari produk..."
+              className={`
+        transition-all duration-300
+        bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm
+        focus:outline-none focus:ring-1 focus:ring-accent
+        ${mobileSearchOpen ? "w-40 ml-2 opacity-100" : "w-0 ml-0 opacity-0"}
+      `}
+              style={{
+                minWidth: 0,
+                paddingLeft: mobileSearchOpen ? undefined : 0,
+                paddingRight: mobileSearchOpen ? undefined : 0,
+              }}
+              autoFocus={mobileSearchOpen}
+              onBlur={() => setMobileSearchOpen(false)}
+            />
+            <FaSearch
+              className="w-4 h-4 text-gray-500 cursor-pointer ml-2 font-regular"
+              onClick={() => setMobileSearchOpen((v) => !v)}
+            />
+            {/* Search Results Dropdown */}
+            {showResults && (
+              <div className="absolute top-full mt-2 bg-white w-96 shadow-lg border rounded-md z-50 right-2">
+                {loadingSearch ? (
+                  <p className="p-3 text-gray-500 text-sm text-center">
+                    Mencari...
+                  </p>
+                ) : searchResults.length > 0 ? (
+                  searchResults.map((product) => (
+                    <div
+                      key={product.product_id}
+                      onClick={() => {
+                        router.push(`/product/${product.product_id}`);
+                        setShowResults(false);
+                      }}
+                      className="flex items-start gap-3 p-3 hover:bg-gray-50 cursor-pointer transition"
+                    >
+                      <Image
+                        src={
+                          product.product_pictures &&
+                          product.product_pictures.length > 0
+                            ? process.env.NEXT_PUBLIC_BACKEND_URL +
+                              product.product_pictures[0]
+                            : assets.product_placeholder
+                        }
+                        alt={product.product_name}
+                        width={50}
+                        height={50}
+                        className="rounded-md object-cover"
+                      />
+                      <div>
+                        <p className="font-medium text-sm">
+                          {product.product_name}
+                        </p>
+                        <p className="text-xs text-gray-500 line-clamp-2">
+                          {product.product_description}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="p-3 text-gray-500 text-sm text-center">
+                    Produk tidak ditemukan
+                  </p>
+                )}
+              </div>
+            )}
+          </form>
+        </div>
 
         <button
           onClick={() => setMenuOpen(!menuOpen)}
@@ -300,22 +403,16 @@ const Navbar = () => {
           {user && (
             <>
               <Link
-                href="/profile?tab=wishlist"
+                href="/profile"
                 className="w-full text-center py-4 hover:bg-gray-100 hover:text-accent md:hidden"
               >
-                Wishlist
-              </Link>
-              <Link
-                href="/cart"
-                className="w-full text-center py-4 hover:bg-gray-100 hover:text-accent md:hidden"
-              >
-                Keranjang {cartCount > 0 && `(${cartCount})`}
+                Profile
               </Link>
             </>
           )}
 
-          {(user || admin) && (
-            <div className="w-full px-4 pt-2 pb-4 mt-2 border-t border-gray-200">
+          <div className="w-full px-4 pt-2 pb-4 mt-2 border-t border-gray-200">
+            {user || admin ? (
               <button
                 onClick={user ? userLogout : logoutAdmin}
                 className="w-full bg-red-500 text-white flex justify-center gap-2 px-5 py-2.5 rounded-full text-base hover:bg-red-600"
@@ -323,8 +420,15 @@ const Navbar = () => {
                 <FaSignOutAlt />
                 <span>Logout</span>
               </button>
-            </div>
-          )}
+            ) : (
+              <button
+                onClick={() => router.push("/account")}
+                className="w-full bg-accent text-white flex justify-center gap-2 px-5 py-2.5 rounded-full text-base hover:bg-accent/90"
+              >
+                Masuk / Daftar
+              </button>
+            )}
+          </div>
         </div>
       )}
     </nav>

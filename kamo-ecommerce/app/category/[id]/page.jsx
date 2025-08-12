@@ -75,7 +75,7 @@ const CategoryProductPage = () => {
   return (
     <>
       <Navbar />
-      <div className="min-h-[70vh] px-4 sm:px-6 lg:px-32 py-14 pb-24 md:pb-14">
+      <div className="min-h-[70vh] px-4 sm:px-6 lg:px-32 py-14 pb-24 md:pb-14 mx-auto">
         {/* Header */}
         <div className="flex flex-col items-start w-full mb-8">
           <button

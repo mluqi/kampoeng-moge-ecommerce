@@ -5,12 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import api from "@/service/api";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation } from "swiper/modules";
+import { Navigation, Pagination } from "swiper/modules";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 
 // Import Swiper styles
 import "swiper/css";
 import "swiper/css/navigation";
+import "swiper/css/pagination";
 
 import { assets } from "@/assets/assets";
 
@@ -100,7 +101,7 @@ const FeaturedProduct = () => {
         // Tampilan Slider
         <div className="relative md:px-14 px-4 mt-12">
           <Swiper
-            modules={[Navigation]}
+            modules={[Navigation, Pagination]}
             spaceBetween={30}
             slidesPerView={1}
             loop={true}
@@ -112,11 +113,15 @@ const FeaturedProduct = () => {
               nextEl: ".swiper-button-next-featured",
               prevEl: ".swiper-button-prev-featured",
             }}
+            pagination={{
+              clickable: true,
+              dynamicBullets: true,
+            }}
             breakpoints={{
               640: { slidesPerView: 2, spaceBetween: 20 },
               1024: { slidesPerView: 3, spaceBetween: 30 },
             }}
-            className="!pb-2"
+            className="!pb-10"
           >
             {products.map((product) => (
               <SwiperSlide key={product.id}>
@@ -140,6 +145,16 @@ const FeaturedProduct = () => {
           ))}
         </div>
       )}
+
+      {/* Custom Styles for Swiper Pagination */}
+      <style jsx global>{`
+        .swiper-pagination-bullet {
+          background: #999ca1ff; /* Warna abu-abu untuk dot tidak aktif */
+        }
+        .swiper-pagination-bullet-active {
+          background: #004526 !important; /* Warna biru untuk dot aktif */
+        }
+      `}</style>
     </div>
   );
 };

@@ -1,16 +1,31 @@
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middlewares/authMiddleware");
-const { getAllSettings, updateSettings, updateActiveShippingServices, getSettingByKey } = require("../controllers/settingController");
+const {
+  getAllSettings,
+  updateSettings,
+  updateActiveShippingServices,
+  getSettingByKey,
+} = require("../controllers/settingController");
+const multer = require("multer");
+const fs = require("fs");
 
-// Endpoint untuk mengambil pengaturan (bisa juga dibuat publik jika perlu)
+const settingStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dest = "uploads/settings";
+    fs.mkdirSync(dest, { recursive: true });
+    cb(null, dest);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname.replace(/\s/g, "_")}`);
+  },
+});
+const uploadLogo = multer({ storage: settingStorage });
+
 router.get("/:key", getSettingByKey);
 router.get("/", getAllSettings);
+router.put("/", authMiddleware, uploadLogo.single("logo"), updateSettings);
 
-// Endpoint khusus admin untuk memperbarui pengaturan
-router.put("/", authMiddleware, updateSettings);
+router.put("/shipping-services", authMiddleware, updateActiveShippingServices);
 
 module.exports = router;
-
-// Route untuk update service JNE yang ditampilkan
-router.put("/shipping-services", authMiddleware, updateActiveShippingServices);

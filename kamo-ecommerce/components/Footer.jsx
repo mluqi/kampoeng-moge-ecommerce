@@ -8,6 +8,7 @@ import { FaInstagram, FaFacebook, FaTiktok, FaYoutube } from "react-icons/fa";
 
 const Footer = () => {
   const [settings, setSettings] = useState(null);
+  const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -26,7 +27,13 @@ const Footer = () => {
     <footer>
       <div className="flex flex-col md:flex-row items-start justify-center px-6 md:px-16 lg:px-32 gap-10 py-14 text-gray-500 border-t border-gray-200">
         <div className="w-4/5">
-          <Image className="w-28 md:w-32" src={assets.logo_accent} alt="logo" />
+          <Image
+            className="w-28 md:w-32"
+            src={settings?.footer?.logo_url ? `${baseUrl}${settings.footer.logo_url}` : assets.logo}
+            alt="logo"
+            width={128}
+            height={40}
+          />
           <p className="mt-6 text-sm">
             {settings?.footer?.description || "Memuat deskripsi..."}
           </p>
@@ -94,7 +101,7 @@ const Footer = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-accent transition"
-                >
+              >
                 <FaInstagram />
               </a>
               <a
@@ -102,7 +109,7 @@ const Footer = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-accent transition"
-                >
+              >
                 <FaFacebook />
               </a>
               <a
@@ -110,7 +117,7 @@ const Footer = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-accent transition"
-                >
+              >
                 <FaTiktok />
               </a>
               <a

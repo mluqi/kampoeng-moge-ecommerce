@@ -30,9 +30,11 @@ const PERIOD_OPTIONS = [
 const ProductAnalyticsPage = () => {
   const [period, setPeriod] = useState("7d");
   const [topProducts, setTopProducts] = useState([]);
+  const [chartData, setChartData] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [loadingChart, setLoadingChart] = useState(true);
 
   const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -58,24 +60,44 @@ const ProductAnalyticsPage = () => {
     }
   }, []);
 
+  const fetchChartData = useCallback(async (currentPeriod) => {
+    setLoadingChart(true);
+    try {
+      const response = await api.get("/analytics/top-products", {
+        params: {
+          period: currentPeriod,
+          limit: 5,
+          page: 1,
+        },
+      });
+      const formattedData = response.data.data.map((p) => ({
+        name:
+          p.product_name.substring(0, 15) +
+          (p.product_name.length > 15 ? "..." : ""),
+        views: p.view_count,
+      }));
+      setChartData(formattedData);
+    } catch (error) {
+      console.error("Gagal mengambil data chart:", error);
+      setChartData([]);
+    } finally {
+      setLoadingChart(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchTopProducts(period, currentPage);
   }, [period, currentPage, fetchTopProducts]);
+
+  useEffect(() => {
+    fetchChartData(period);
+  }, [period, fetchChartData]);
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
     }
   };
-
-const chartData = topProducts
-  .slice(0, 5)
-  .map((p) => ({
-    name:
-      p.product_name.substring(0, 15) +
-      (p.product_name.length > 15 ? "..." : ""),
-    views: p.view_count,
-  }));
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -107,7 +129,11 @@ const chartData = topProducts
       </div>
 
       {/* Chart Section */}
-      {!loading && topProducts.length > 0 && (
+      {loadingChart ? (
+        <div className="mb-8 flex h-[350px] items-center justify-center rounded-lg border bg-white p-4 shadow-sm">
+          <Loading />
+        </div>
+      ) : chartData.length > 0 ? (
         <div className="mb-8 bg-white p-4 rounded-lg shadow-sm border">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">
             Top 5 Produk Dilihat
@@ -162,7 +188,7 @@ const chartData = topProducts
             * Data berdasarkan jumlah pengunjung dalam periode yang dipilih
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Product List */}
       {loading ? (
@@ -178,7 +204,7 @@ const chartData = topProducts
                   className="flex items-center gap-4"
                 >
                   <span className="text-lg font-bold text-gray-400 w-8 text-center">
-                    {index + 1}
+                    {(currentPage - 1) * 10 + index + 1}
                   </span>
                   <Image
                     src={

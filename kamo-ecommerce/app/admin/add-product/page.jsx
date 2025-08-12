@@ -51,25 +51,34 @@ const AddProduct = () => {
   const [descriptionLength, setDescriptionLength] = useState(0);
 
   // 3. Buat callback untuk menerima data dari komponen ProductTiktokSection
-  const handleTiktokDataChange = useCallback((attributeValues, categoryId, keyword) => {
-    setTiktokCategoryId(categoryId);
-    setCategoryKeyword(keyword);
+  const handleTiktokDataChange = useCallback(
+    (attributeValues, categoryId, keyword) => {
+      setTiktokCategoryId(categoryId);
+      setCategoryKeyword(keyword);
 
-    // Format data agar sesuai dengan struktur payload API TikTok
-    const formattedAttributes = Object.entries(attributeValues)
-      .filter(([, value]) => value && value.name) // Filter atribut yang punya value
-      .map(([attrId, value]) => {
-        const attributeValue = { name: value.name };
-        if (value.id) {
-          attributeValue.id = value.id;
-        }
-        return {
-          id: attrId,
-          values: [attributeValue],
-        };
-      });
-    setTiktokProductAttributes(formattedAttributes);
-  }, []);
+      // Format data agar sesuai dengan struktur payload API TikTok
+      const formattedAttributes = Object.entries(attributeValues)
+        .filter(([, value]) => value && value.name) // Filter atribut yang punya value
+        .map(([attrId, value]) => {
+          const attributeValue = { name: value.name };
+          if (value.id) {
+            attributeValue.id = value.id;
+          }
+          return {
+            id: attrId,
+            values: [attributeValue],
+          };
+        });
+      setTiktokProductAttributes(formattedAttributes);
+    },
+    []
+  );
+
+  const formatNumber = (value) => {
+    const numericValue = value.replace(/\D/g, "");
+    if (!numericValue) return "";
+    return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
 
   // Konfigurasi modul untuk toolbar ReactQuill
   const modules = useMemo(
@@ -105,6 +114,8 @@ const AddProduct = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+
+    const numericPrice = price.replace(/\./g, '');
 
     // --- START: Frontend Validation ---
     if (name.length < 25 || name.length > 255) {
@@ -166,7 +177,7 @@ const AddProduct = () => {
       formData.append("name", name);
       formData.append("description", description);
       formData.append("sku", sku);
-      formData.append("price", price);
+      formData.append("price", numericPrice);
       formData.append("stock", stock);
       formData.append("minOrder", minOrder);
       formData.append("condition", condition);
@@ -226,7 +237,7 @@ const AddProduct = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-sm p-6">
+      <div className="max-w-8xl mx-auto bg-white rounded-lg shadow-sm p-6">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">
           Tambah Produk Baru
         </h1>
@@ -242,7 +253,7 @@ const AddProduct = () => {
                 <div key={index} className="flex flex-col items-center">
                   <label
                     htmlFor={`image${index}`}
-                    className="w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-accent transition-colors"
+                    className="w-full h-44 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-accent transition-colors"
                   >
                     {files[index] ? (
                       <Image
@@ -320,6 +331,9 @@ const AddProduct = () => {
                   maxLength={255}
                   required
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Catatan: Nama produk harus antara 25 dan 255 karakter.
+                </p>
               </div>
 
               <div>
@@ -380,7 +394,6 @@ const AddProduct = () => {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label
                   className="block text-sm font-medium text-gray-700 mb-1"
@@ -390,10 +403,13 @@ const AddProduct = () => {
                 </label>
                 <input
                   id="product-price"
-                  type="number"
+                  type="text"
                   placeholder="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
-                  onChange={(e) => setPrice(e.target.value)}
+                  onChange={(e) => {
+                    const formatted = formatNumber(e.target.value);
+                    setPrice(formatted);
+                  }}
                   value={price}
                   required
                 />
@@ -423,8 +439,16 @@ const AddProduct = () => {
                 />
               </div>
               <p className="mt-1 text-xs text-gray-500 flex justify-between">
-                <span>Gunakan editor untuk memformat deskripsi produk Anda.</span>
-                <span className={descriptionLength < 60 || descriptionLength > 10000 ? 'text-red-500 font-medium' : 'text-gray-500'}>
+                <span>
+                  Gunakan editor untuk memformat deskripsi produk Anda.
+                </span>
+                <span
+                  className={
+                    descriptionLength < 60 || descriptionLength > 10000
+                      ? "text-red-500 font-medium"
+                      : "text-gray-500"
+                  }
+                >
                   Karakter: {descriptionLength} (min 60, max 10000)
                 </span>
               </p>
@@ -513,6 +537,10 @@ const AddProduct = () => {
                   value={weight}
                   required
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Catatan: Rasio berat Seharusnya kurang dari 1.1. Rumus:
+                  (Panjang x Lebar x Tinggi / 6000) / Berat.
+                </p>
               </div>
 
               <div>
@@ -551,6 +579,10 @@ const AddProduct = () => {
                     required
                   />
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Catatan: Setiap dimensi (panjang, lebar, tinggi) harus antara
+                  0.01 dan 60 cm.
+                </p>
               </div>
             </div>
           </div>

@@ -133,19 +133,28 @@ export default function ProductFilterBar({
       </div>
 
       {/* Sort Dropdown */}
-      <div className="flex gap-3 p-2 bg-gray-50 rounded-lg max-w-fit">
-        <select
-          value={selectedSort}
-          onChange={(e) => onSortChange(e.target.value)}
-          className="px-3 py-2 rounded border border-gray-300 bg-white text-gray-800 
+      <div className="flex justify-between items-center gap-3">
+        <div className="relative w-full max-w-xs">
+          <p className="text-2xl mt-4 font-medium text-left w-full">
+            Produk Terbaru
+          </p>
+          <div className="w-16 h-0.5 bg-accent rounded-full mt-2"></div>
+        </div>
+
+        <div className="flex gap-3 p-2 bg-gray-50 rounded-lg max-w-fit">
+          <select
+            value={selectedSort}
+            onChange={(e) => onSortChange(e.target.value)}
+            className="px-3 py-2 rounded border border-gray-300 bg-white text-gray-800 
                     text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 cursor-pointer min-w-[150px]"
-        >
-          {SORT_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   );

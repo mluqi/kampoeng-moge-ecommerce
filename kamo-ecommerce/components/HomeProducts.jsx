@@ -37,8 +37,7 @@ const HomeProducts = () => {
 
   return (
     <div className="flex flex-col items-center pt-14">
-      <p className="text-2xl font-medium text-left w-full">Produk populer</p>
-
+      <p className="text-2xl font-medium text-left w-full">Kategori</p>
       {/* Filter Bar */}
       <div className="mt-6 w-full">
         <ProductFilterBar
@@ -52,7 +51,28 @@ const HomeProducts = () => {
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 flex-col items-center gap-6 mt-6 pb-14 w-full">
         {loading ? (
-          <p className="col-span-full text-center">Memuat produk...</p>
+          [...Array(10)].map((_, i) => (
+            <div key={i} className="w-full">
+              <div
+                className="aspect-square bg-gray-200 rounded-xl animate-pulse"
+                style={{ animationDuration: "1.2s" }}
+              />
+              <div className="mt-3 space-y-3">
+                <div
+                  className="h-4 bg-gray-200 rounded w-full animate-pulse"
+                  style={{ animationDuration: "1.2s" }}
+                />
+                <div
+                  className="h-4 bg-gray-200 rounded w-2/3 animate-pulse"
+                  style={{ animationDuration: "1.2s" }}
+                />
+                <div
+                  className="h-5 bg-gray-200 rounded w-1/2 animate-pulse"
+                  style={{ animationDuration: "1.2s" }}
+                />
+              </div>
+            </div>
+          ))
         ) : displayedProducts.length > 0 ? (
           displayedProducts.map((product) => (
             <ProductCard key={product.product_id} product={product} />

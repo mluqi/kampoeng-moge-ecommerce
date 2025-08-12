@@ -66,6 +66,12 @@ const ProductDetailEdit = () => {
   const [tiktokProductAttributes, setTiktokProductAttributes] = useState([]);
   const [initialTiktokAttributes, setInitialTiktokAttributes] = useState({});
 
+  const formatNumber = (value) => {
+    const numericValue = value.replace(/\D/g, "");
+    if (!numericValue) return "";
+    return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
   useEffect(() => {
     let isMounted = true;
     setLoading(true);

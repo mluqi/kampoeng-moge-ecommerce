@@ -9,12 +9,15 @@ const AdminSettingsPage = () => {
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [logoPreview, setLogoPreview] = useState("");
+  const [logoFile, setLogoFile] = useState(null);
+
+  const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         const res = await api.get("/settings");
-        // Inisialisasi state dengan data yang ada atau string kosong
         setSettings({
           footer_description: res.data.footer?.description || "",
           footer_phone: res.data.footer?.phone || "",
@@ -24,6 +27,9 @@ const AdminSettingsPage = () => {
           footer_tiktok_url: res.data.footer?.tiktok_url || "",
           footer_youtube_url: res.data.footer?.youtube_url || "",
         });
+        setLogoPreview(
+          res.data.footer?.logo_url ? res.data.footer.logo_url : ""
+        );
       } catch (error) {
         toast.error("Gagal memuat pengaturan.");
         console.error(error);
@@ -34,6 +40,15 @@ const AdminSettingsPage = () => {
     fetchSettings();
   }, []);
 
+  // Tambahkan handler file
+  const handleLogoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setLogoFile(file);
+      setLogoPreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setSettings((prev) => ({ ...prev, [name]: value }));
@@ -42,7 +57,6 @@ const AdminSettingsPage = () => {
   const handleSave = async () => {
     setIsSaving(true);
 
-    // Ubah format state menjadi array yang diharapkan oleh backend
     const payload = [
       {
         key: "description",
@@ -73,7 +87,16 @@ const AdminSettingsPage = () => {
       },
     ];
 
-    const promise = api.put("/settings", payload);
+    // Gunakan FormData jika upload file
+    const formData = new FormData();
+    formData.append("settings", JSON.stringify(payload));
+    if (logoFile) {
+      formData.append("logo", logoFile);
+    }
+
+    const promise = api.put("/settings", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
 
     toast.promise(promise, {
       loading: "Menyimpan pengaturan...",
@@ -130,6 +153,45 @@ const AdminSettingsPage = () => {
           Pengaturan Footer
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Logo Upload Section */}
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Logo Footer
+            </label>
+            <div className="flex items-center gap-4">
+              {logoPreview && (
+                <img
+                  src={
+                    logoPreview.startsWith("blob:")
+                      ? logoPreview
+                      : baseUrl + logoPreview
+                  }
+                  alt="Logo Preview"
+                  className="w-32 h-auto border rounded-md bg-gray-100 p-1 object-contain"
+                />
+              )}
+              <div className="flex flex-col">
+                <label
+                  htmlFor="logo-upload"
+                  className="cursor-pointer bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm leading-4 font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
+                >
+                  <span>Ganti Logo</span>
+                  <input
+                    id="logo-upload"
+                    name="logo"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoChange}
+                    className="sr-only"
+                  />
+                </label>
+                <p className="mt-1 text-xs text-gray-500">
+                  PNG, SVG direkomendasikan. Maksimal ukuran 500kb.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="md:col-span-2">
             <label
               htmlFor="footer_description"

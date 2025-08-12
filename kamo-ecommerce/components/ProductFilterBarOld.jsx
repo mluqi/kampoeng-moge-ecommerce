@@ -38,10 +38,10 @@ export default function ProductFilterBar({
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
       {/* Category Selection */}
-      <div className="relative">
-        <div className="flex flex-wrap gap-2 mb-2">
+      <div className="relative w-full md:w-auto">
+        <div className="flex flex-wrap gap-2">
           {/* All Collections button */}
           <button
             onClick={() => onCategoryChange("")}
@@ -143,12 +143,11 @@ export default function ProductFilterBar({
       </div>
 
       {/* Sort Dropdown */}
-      <div className="flex gap-3 p-2 bg-gray-50 rounded-lg max-w-fit">
+      <div className="relative min-w-[200px]">
         <select
           value={selectedSort}
           onChange={(e) => onSortChange(e.target.value)}
-          className="px-3 py-2 rounded border border-gray-300 bg-white text-gray-800 
-                    text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 cursor-pointer min-w-[150px]"
+          className="w-full cursor-pointer appearance-none rounded border border-gray-200 bg-white px-4 py-2 pr-10 text-accent transition-all hover:bg-gray-50 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
         >
           {SORT_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -156,6 +155,22 @@ export default function ProductFilterBar({
             </option>
           ))}
         </select>
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+          <svg
+            className="h-5 w-5 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </div>
       </div>
     </div>
   );
