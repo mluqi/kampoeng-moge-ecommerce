@@ -18,10 +18,17 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "product_id",
         as: "reviews",
       });
-      Product.hasMany(models.OrderItem, { foreignKey: "product_id", as: "product" });
+      Product.hasMany(models.OrderItem, {
+        foreignKey: "product_id",
+        as: "product",
+      });
       Product.hasMany(models.ProductViews, {
         foreignKey: "product_id",
         as: "views",
+      });
+      Product.hasMany(models.Message, {
+        foreignKey: "product_id",
+        as: "messages",
       });
     }
   }
@@ -36,6 +43,11 @@ module.exports = (sequelize, DataTypes) => {
       product_description: DataTypes.TEXT,
       product_sku: DataTypes.STRING,
       product_price: DataTypes.BIGINT,
+      product_price_tiktok: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        defaultValue: null,
+      },
       product_stock: DataTypes.INTEGER,
       product_min_order: DataTypes.INTEGER,
       product_condition: DataTypes.STRING,

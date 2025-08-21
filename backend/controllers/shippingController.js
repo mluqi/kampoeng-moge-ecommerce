@@ -4,7 +4,13 @@ const {
   trackingOrder,
 } = require("../services/jne");
 const {
-  Order, OrderItem, Product, list_dest, User, sequelize, Setting,
+  Order,
+  OrderItem,
+  Product,
+  list_dest,
+  User,
+  sequelize,
+  Setting,
 } = require("../models");
 const { getToken } = require("next-auth/jwt");
 
@@ -47,12 +53,12 @@ exports.getShippingRates = async (req, res) => {
   const user = await getUserFromToken(req);
   if (!user) return res.status(401).json({ message: "Unauthorized" });
 
-//   if (order.shipping_number) {
-//     console.log(
-//       `AWB already exists for order ${order.order_id}. Skipping generation.`
-//     );
-//     return;
-//   }
+  //   if (order.shipping_number) {
+  //     console.log(
+  //       `AWB already exists for order ${order.order_id}. Skipping generation.`
+  //     );
+  //     return;
+  //   }
 
   if (!origin || !destination?.zipCode || !weight || !Number(weight) > 0) {
     return res.status(400).json({
@@ -163,10 +169,10 @@ exports.generateAwbForOrder = async (order, transaction) => {
     receiverZip: shippingAddress.address_pincode,
     receiverPhone: shippingAddress.address_phone,
     quantity: totalQuantity,
-    weight: Math.max(1, totalWeight), 
+    weight: Math.max(1, totalWeight),
     goodsDescription: goodsDescription,
     goodsValue: order.subtotal,
-    useInsurance: "N", 
+    useInsurance: "N",
     destinationCode: destinationCode,
     serviceCode: order.shipping_method.split(" ")[0], // e.g., 'JTR' from 'JTR (3-4 hari)'
     useCOD: order.payment_method === "cod" ? "YES" : "N",
@@ -206,12 +212,14 @@ exports.trackOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found." });
     }
 
-    if (!order.shipping_awb) {
+    if (!order.shipping_number) {
       await t.rollback();
-      return res.status(400).json({ message: "No AWB number found for this order." });
+      return res
+        .status(400)
+        .json({ message: "No AWB number found for this order." });
     }
 
-    const trackingData = await trackingOrder(order.shipping_awb);
+    const trackingData = await trackingOrder(order.shipping_number);
 
     // Check the last status in the history to update the order.
     // JNE status 'DELIVERED' usually means the package has arrived.
@@ -248,10 +256,27 @@ exports.trackOrder = async (req, res) => {
   }
 };
 
+exports.trackByAwb = async (req, res) => {
+  const { awb } = req.params;
+  if (!awb) {
+    return res.status(400).json({ message: "Nomor resi (AWB) diperlukan." });
+  }
+
+  try {
+    const trackingData = await trackingOrder(awb);
+
+    res.status(200).json(trackingData);
+  } catch (error) {
+    console.error("Error tracking order by AWB:", error);
+    res
+      .status(500)
+      .json({ message: error.message || "Gagal melacak pesanan." });
+  }
+};
 
 // ADMIN
 // idenya untuk menampilkan service jne apa saja yang akan ditampilkan di dropdown saatcheckout ada jtr, reg, dan yes
 // exports.changeServiceToShow = async (req, res) => {
 //   const { orderId } = req.params;
-//   const 
+//   const
 // }

@@ -15,7 +15,7 @@ const JNE_SHIPPER_CITY = process.env.JNE_SHIPPER_CITY;
 const JNE_SHIPPER_REGION = process.env.JNE_SHIPPER_REGION;
 const JNE_SHIPPER_ZIP = process.env.JNE_SHIPPER_ZIP;
 const JNE_SHIPPER_PHONE = process.env.JNE_SHIPPER_PHONE;
-const JNE_ORIGIN_CODE = process.env.JNE_ORIGIN_CODE; 
+const JNE_ORIGIN_CODE = process.env.JNE_ORIGIN_CODE;
 
 const jneInstance = axios.create({
   baseURL: JNE_API_URL,
@@ -189,8 +189,7 @@ const trackingOrder = async (trackingNumber) => {
     } else {
       // JNE might return an error message in a different structure
       const errorMessage =
-        response.data?.detail?.[0]?.status ||
-        "Invalid tracking response from JNE.";
+        response.data?.detail?.[0]?.status || response.data?.error;
       throw new Error(errorMessage);
     }
   } catch (error) {

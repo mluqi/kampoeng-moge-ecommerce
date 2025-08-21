@@ -10,6 +10,7 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       Message.belongsTo(models.Conversation, { foreignKey: "conversationId" });
       Message.belongsTo(models.User, { foreignKey: "senderId", as: "sender" });
+      Message.belongsTo(models.Product, { foreignKey: "product_id", as: "product" });
     }
   }
   Message.init(
@@ -24,6 +25,11 @@ module.exports = (sequelize, DataTypes) => {
       senderId: { type: DataTypes.INTEGER, allowNull: false },
       sender_role: { type: DataTypes.STRING, allowNull: false },
       content: { type: DataTypes.TEXT, allowNull: false },
+      product_id: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        references: { model: "Product", key: "product_id" },
+      },
       isRead: { type: DataTypes.BOOLEAN, defaultValue: false },
     },
     {

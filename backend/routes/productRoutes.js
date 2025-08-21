@@ -14,6 +14,7 @@ const {
   getCategoryById,
   addCategory,
   updateCategory,
+  reorderCategories,
   deleteCategory,
   getProductsByCategory,
   getAllCategoryOnTiktokShop,
@@ -59,6 +60,7 @@ router.post(
   uploadCategory.fields([{ name: "pictures", maxCount: 1 }]),
   addCategory
 );
+router.post("/categories/reorder", authMiddleware, reorderCategories);
 router.get("/categories/:id", getCategoryById);
 router.put(
   "/categories/:id",

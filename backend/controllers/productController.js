@@ -4,6 +4,7 @@ const {
   ProductViews,
   User,
   admin_akses,
+  sequelize
 } = require("../models");
 const { getToken } = require("next-auth/jwt");
 const { Op } = require("sequelize");
@@ -102,8 +103,13 @@ exports.getAllProducts = async (req, res) => {
     }
 
     if (search) {
-      whereClause.product_name = {
-        [Op.like]: `%${search}%`,
+      whereClause[Op.or] = {
+        product_name: {
+          [Op.like]: `%${search}%`,
+        },
+        product_sku: {
+          [Op.like]: `%${search}%`,
+        },
       };
     }
 
@@ -120,7 +126,7 @@ exports.getAllProducts = async (req, res) => {
     });
 
     res.status(200).json({
-      data: rows.map(parseProductJSONFields), // Parse JSON fields before sending
+      data: rows.map(parseProductJSONFields),
       totalPages: Math.ceil(count / limitNum),
       currentPage: pageNum,
       totalProducts: count,
@@ -136,6 +142,7 @@ exports.getAllProductsWithoutOutOfStock = async (req, res) => {
       page = 1,
       limit = 12,
       category,
+      brand,
       search,
       status,
       sort = "newest",
@@ -149,14 +156,23 @@ exports.getAllProductsWithoutOutOfStock = async (req, res) => {
 
     whereClause.product_stock = { [Op.gt]: 0 };
 
+    if (brand) {
+      console.log("Filtering by brand:", brand);
+      whereClause.product_brand = { [Op.like]: `%${brand}%` };
+    }
+
     if (category && category !== "All") {
       whereClause.product_category = category;
     }
 
     if (search) {
-      whereClause.product_name = {
-        [Op.like]: `%${search}%`,
-      };
+      whereClause[Op.or] = [
+        {
+          product_name: {
+            [Op.like]: `%${search}%`,
+          },
+        },
+      ];
     }
 
     if (status && ["active", "inactive"].includes(status)) {
@@ -194,6 +210,7 @@ exports.getAllProductsWithoutOutOfStock = async (req, res) => {
       totalProducts: count,
     });
   } catch (error) {
+    console.error("Error fetching products:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -238,6 +255,7 @@ exports.createProduct = async (req, res) => {
     description,
     sku,
     price,
+    product_price_tiktok,
     stock,
     condition,
     status,
@@ -345,6 +363,7 @@ exports.createProduct = async (req, res) => {
       product_description: description,
       product_sku: sku,
       product_price: price,
+      product_price_tiktok: product_price_tiktok,
       product_stock: stock,
       product_condition: condition,
       product_status: status,
@@ -408,7 +427,10 @@ exports.createProduct = async (req, res) => {
           package_weight: { value: weight, unit: "KILOGRAM" },
           skus: [
             {
-              price: { amount: price, currency: "IDR" },
+              price: {
+                amount: product_price_tiktok || price,
+                currency: "IDR",
+              },
               inventory: [
                 {
                   warehouse_id: process.env.TIKPED_WAREHOUSE_ID,
@@ -418,9 +440,11 @@ exports.createProduct = async (req, res) => {
               seller_sku: sku,
             },
           ],
+          listing_platforms: ["TOKOPEDIA", "TIKTOK_SHOP"],
         };
 
         const tiktokResponse = await createTiktokProduct(tiktokPayload);
+        console.log(tiktokResponse);
         if (!tiktokResponse?.data?.product_id) {
           await product.destroy();
           deleteFiles(pictures);
@@ -468,6 +492,7 @@ exports.updateProduct = async (req, res) => {
     description,
     sku,
     price,
+    product_price_tiktok,
     stock,
     condition,
     status,
@@ -593,6 +618,7 @@ exports.updateProduct = async (req, res) => {
       product_description: description,
       product_sku: sku,
       product_price: price,
+      product_price_tiktok: product_price_tiktok,
       product_stock: stock,
       product_condition: condition,
       product_status: status,
@@ -660,7 +686,10 @@ exports.updateProduct = async (req, res) => {
           package_weight: { value: weight, unit: "KILOGRAM" },
           skus: [
             {
-              price: { amount: price, currency: "IDR" },
+              price: {
+                amount: product_price_tiktok || price,
+                currency: "IDR",
+              },
               inventory: [
                 {
                   warehouse_id: process.env.TIKPED_WAREHOUSE_ID,
@@ -818,7 +847,9 @@ exports.deleteProduct = async (req, res) => {
 
 exports.getAllCategories = async (req, res) => {
   try {
-    const categories = await Category.findAll();
+    const categories = await Category.findAll({
+      order: [["category_display_order", "ASC"]],
+    });
     res.status(200).json(categories);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -838,7 +869,7 @@ exports.getCategoryById = async (req, res) => {
 };
 
 exports.addCategory = async (req, res) => {
-  const { category_name } = req.body;
+  const { category_name, category_display_order } = req.body;
   if (!category_name) {
     return res.status(400).json({ message: "Category name is required" });
   }
@@ -851,10 +882,21 @@ exports.addCategory = async (req, res) => {
 
   try {
     const category_id = await generateCategoryId();
+
+    // Jika category_display_order tidak disediakan, cari urutan maksimal dan tambahkan 1
+    let order = category_display_order;
+    if (order === undefined || order === null) {
+      const maxOrderCategory = await Category.findOne({
+        order: [["category_display_order", "DESC"]],
+        attributes: ["category_display_order"],
+      });
+      order = (maxOrderCategory?.category_display_order || 0) + 1;
+    }
     const category = await Category.create({
       category_id,
       category_name,
       category_image: picturePath, // Simpan path string, bukan array
+      category_display_order: order,
     });
     res.status(201).json(category);
   } catch (error) {
@@ -867,7 +909,7 @@ exports.addCategory = async (req, res) => {
 };
 
 exports.updateCategory = async (req, res) => {
-  const { category_name } = req.body;
+  const { category_name, category_display_order } = req.body;
   if (!category_name) {
     return res.status(400).json({ message: "Category name is required" });
   }
@@ -884,7 +926,14 @@ exports.updateCategory = async (req, res) => {
       return res.status(404).json({ message: "Category not found" });
     }
     const oldPicturePath = category.category_image;
-    const updateData = { category_name, category_image: oldPicturePath };
+    const updateData = {
+      category_name,
+      category_image: oldPicturePath,
+      category_display_order:
+        category_display_order !== undefined
+          ? category_display_order
+          : category.category_display_order,
+    };
 
     // Jika ada gambar baru, update path gambar dan hapus yang lama
     if (newPicturePath) {
@@ -899,6 +948,31 @@ exports.updateCategory = async (req, res) => {
     res.status(200).json(category);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+exports.reorderCategories = async (req, res) => {
+  const { order } = req.body;
+  console.log(order);
+
+  if (!Array.isArray(order)) {
+    return res.status(400).json({ message: "Format data tidak valid." });
+  }
+
+  const t = await sequelize.transaction();
+  try {
+    for (const item of order) {
+      await Category.update(
+        { category_display_order: item.display_order },
+        { where: { category_id: item.category_id }, transaction: t }
+      );
+    }
+    await t.commit();
+    res.status(200).json({ message: "Urutan kategori berhasil diperbarui." });
+  } catch (error) {
+    await t.rollback();
+    console.error("Gagal memperbarui urutan kategori:", error);
+    res.status(500).json({ message: "Gagal memperbarui urutan kategori." });
   }
 };
 

@@ -2,16 +2,25 @@ const express = require("express");
 const router = express.Router();
 const {
   getTopProducts,
-  getAllCartItems,
-  getCartAnalyticsSummary,
+  getProductViewers,
+  getProductCartAdds,
 } = require("../controllers/analyticsController");
 const authMiddleware = require("../middlewares/authMiddleware");
 
 // Endpoint ini bisa bersifat publik atau diproteksi dengan authMiddleware sesuai kebutuhan.
-router.get("/top-products", getTopProducts);
+// Untuk admin panel, sebaiknya diproteksi.
+router.get("/top-products", authMiddleware, getTopProducts);
 
-// Admin-only routes
-router.get("/cart-items", authMiddleware, getAllCartItems);
-router.get("/cart-summary", authMiddleware, getCartAnalyticsSummary);
+// Admin-only routes untuk detail akordeon
+router.get(
+  "/top-products/:productId/viewers",
+  authMiddleware,
+  getProductViewers
+);
+router.get(
+  "/top-products/:productId/cart-adds",
+  authMiddleware,
+  getProductCartAdds
+);
 
 module.exports = router;

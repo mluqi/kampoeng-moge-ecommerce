@@ -40,14 +40,37 @@ const parseProductJSONFields = (productData) => {
   return product;
 };
 
-/**
- * @description Mengambil produk yang paling sering dilihat berdasarkan periode waktu.
- * @route GET /api/analytics/top-products?period=7d&limit=10
- * @access Public
- */
-exports.getTopProducts = async (req, res) => {
-  const { period = "7d", limit = 10, page = 1 } = req.query;
+// Helper function to get start date from period string like "24h" or "7d"
+const getStartDateFromPeriod = (periodStr = "24h") => {
+  const now = new Date();
+  if (periodStr.endsWith("h")) {
+    const hours = parseInt(periodStr, 10);
+    if (!isNaN(hours)) {
+      return new Date(now.setHours(now.getHours() - hours));
+    }
+  }
 
+  const days = parseInt(periodStr, 10);
+  if (!isNaN(days)) {
+    return new Date(now.setDate(now.getDate() - days));
+  }
+
+  // Fallback for invalid format, default to 7 days
+  return new Date(new Date().setDate(new Date().getDate() - 7));
+};
+
+// Helper function untuk menentukan rentang tanggal dari query params
+const getDateRange = (query) => {
+  const { period = "7d", startDate, endDate } = query;
+
+  // Prioritaskan rentang tanggal kustom jika ada
+  if (startDate && endDate) {
+    return {
+      [Op.between]: [new Date(startDate), new Date(endDate)],
+    };
+  }
+
+  // Fallback ke periode preset
   let intervalValue;
   let intervalUnit = "DAY";
 
@@ -58,203 +81,243 @@ exports.getTopProducts = async (req, res) => {
     case "3d":
       intervalValue = 3;
       break;
-    case "7d":
-      intervalValue = 7;
-      break;
     case "30d":
       intervalValue = 30;
       break;
+    case "7d":
     default:
-      return res.status(400).json({
-        message: "Invalid period. Use one of: 24h, 3d, 7d, 30d.",
-      });
+      intervalValue = 7;
+      break;
   }
+  return {
+    [Op.gte]: sequelize.literal(
+      `NOW() - INTERVAL ${intervalValue} ${intervalUnit}`
+    ),
+  };
+};
 
+/**
+ * @description Mengambil produk yang paling sering dilihat berdasarkan periode waktu.
+ * @route GET /api/analytics/top-products?period=7d&limit=10&page=1&sort=views|carts|combined
+ * @access Public
+ */
+exports.getTopProducts = async (req, res) => {
+  const { limit = 10, page = 1, sort = "combined" } = req.query;
   const limitNum = parseInt(limit, 10);
   const pageNum = parseInt(page, 10);
   const offset = (pageNum - 1) * limitNum;
 
+  // Determine order based on sort parameter
+  let orderClause;
+  let whereClause;
+  
+  switch (sort) {
+    case "views":
+      orderClause = [
+        [sequelize.literal("view_count"), "DESC"],
+        ["product_name", "ASC"],
+      ];
+      // Filter hanya produk yang memiliki views
+      whereClause = {
+        [Op.and]: [
+          sequelize.literal(`(
+            EXISTS (SELECT 1 FROM ProductViews WHERE ProductViews.product_id = Product.product_id AND ProductViews.viewed_at BETWEEN :startDate AND :endDate)
+          )`),
+          sequelize.literal(`(
+            SELECT COUNT(DISTINCT ProductViews.id)
+            FROM ProductViews
+            WHERE ProductViews.product_id = Product.product_id
+            AND ProductViews.viewed_at BETWEEN :startDate AND :endDate
+          ) > 0`)
+        ]
+      };
+      break;
+      
+    case "carts":
+      orderClause = [
+        [sequelize.literal("cart_add_count"), "DESC"],
+        ["product_name", "ASC"],
+      ];
+      // Filter hanya produk yang memiliki cart adds
+      whereClause = {
+        [Op.and]: [
+          sequelize.literal(`(
+            EXISTS (SELECT 1 FROM CartItem WHERE CartItem.product_id = Product.product_id AND CartItem.createdAt BETWEEN :startDate AND :endDate)
+          )`),
+          sequelize.literal(`(
+            SELECT COALESCE(SUM(CartItem.quantity), 0)
+            FROM CartItem
+            WHERE CartItem.product_id = Product.product_id
+            AND CartItem.createdAt BETWEEN :startDate AND :endDate
+          ) > 0`)
+        ]
+      };
+      break;
+      
+    case "combined":
+    default:
+      orderClause = [
+        [sequelize.literal("view_count + cart_add_count"), "DESC"],
+        ["product_name", "ASC"],
+      ];
+      // Filter produk yang memiliki views atau cart adds
+      whereClause = {
+        [Op.or]: [
+          sequelize.literal(`(
+            EXISTS (SELECT 1 FROM ProductViews WHERE ProductViews.product_id = Product.product_id AND ProductViews.viewed_at BETWEEN :startDate AND :endDate)
+          )`),
+          sequelize.literal(`(
+            EXISTS (SELECT 1 FROM CartItem WHERE CartItem.product_id = Product.product_id AND CartItem.createdAt BETWEEN :startDate AND :endDate)
+          )`),
+        ],
+      };
+      break;
+  }
+
   try {
-    // Gunakan findAndCountAll untuk mendapatkan data dan total group untuk paginasi
-    const { count, rows: topProductViews } = await ProductViews.findAndCountAll(
-      {
-        attributes: [
-          "product_id",
+    const { count, rows } = await Product.findAndCountAll({
+      attributes: {
+        include: [
           [
-            sequelize.fn("COUNT", sequelize.col("ProductViews.id")),
+            sequelize.literal(`(
+              SELECT COUNT(DISTINCT ProductViews.id)
+              FROM ProductViews
+              WHERE ProductViews.product_id = Product.product_id
+              AND ProductViews.viewed_at BETWEEN :startDate AND :endDate
+            )`),
             "view_count",
           ],
+          [
+            sequelize.literal(`(
+              SELECT COALESCE(SUM(CartItem.quantity), 0)
+              FROM CartItem
+              WHERE CartItem.product_id = Product.product_id
+              AND CartItem.createdAt BETWEEN :startDate AND :endDate
+            )`),
+            "cart_add_count",
+          ],
         ],
-        where: {
-          viewed_at: {
-            [Op.gte]: sequelize.literal(
-              `NOW() - INTERVAL ${intervalValue} ${intervalUnit}`
-            ),
-          },
-        },
-        include: [{ model: Product, as: "Product", required: true }],
-        group: ["Product.product_id"],
-        order: [[sequelize.col("view_count"), "DESC"]],
-        limit: limitNum,
-        offset: offset,
-        distinct: true,
-      }
-    );
+      },
+      where: whereClause,
+      order: orderClause,
+      limit: limitNum,
+      offset: offset,
+      replacements: {
+        startDate: req.query.startDate
+          ? new Date(req.query.startDate)
+          : getStartDateFromPeriod(req.query.period),
+        endDate: req.query.endDate ? new Date(req.query.endDate) : new Date(),
+      },
+    });
 
-    const results = topProductViews.map((view) => ({
-      ...parseProductJSONFields(view.Product),
-      view_count: parseInt(view.get("view_count"), 10),
-    }));
+    const results = rows.map((product) => {
+      const plainProduct = parseProductJSONFields(product);
+      return {
+        ...plainProduct,
+        view_count: parseInt(plainProduct.view_count, 10) || 0,
+        cart_add_count: parseInt(plainProduct.cart_add_count, 10) || 0,
+      };
+    });
 
     res.status(200).json({
       data: results,
-      totalPages: Math.ceil(count.length / limitNum),
+      totalPages: Math.ceil(count / limitNum),
       currentPage: pageNum,
+      sort: sort,
     });
   } catch (error) {
     console.error("Error fetching top products:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: "Gagal mengambil data produk teratas." });
   }
 };
 
-// Admin: Get all cart items to make analytics
-exports.getAllCartItems = async (req, res) => {
-  const { limit = 10, page = 1 } = req.query;
-
-  const limitNum = parseInt(limit, 10);
-  const pageNum = parseInt(page, 10);
-  const offset = (pageNum - 1) * limitNum;
-
-  if (isNaN(limitNum) || isNaN(pageNum) || limitNum <= 0 || pageNum <= 0) {
-    return res.status(400).json({ message: "Invalid limit or page number." });
-  }
+/**
+ * @description Mengambil daftar pengguna yang melihat produk tertentu.
+ * @route GET /api/analytics/top-products/:productId/viewers
+ * @access Admin
+ */
+exports.getProductViewers = async (req, res) => {
+  const { productId } = req.params;
+  const dateRange = getDateRange(req.query);
 
   try {
-    const { count, rows: cartItems } = await CartItem.findAndCountAll({
+    const views = await ProductViews.findAll({
+      where: {
+        product_id: productId,
+        viewed_at: dateRange,
+      },
       include: [
         {
           model: User,
           as: "User",
           attributes: ["user_id", "user_email", "user_name"],
+          required: false, // Gunakan LEFT JOIN untuk menyertakan view dari guest
         },
         {
-          model: Product,
-          as: "product",
-          include: [{ model: Category, as: "category" }],
+          model: Product, // Tambahkan ini jika perlu info produk di detail
+          as: "Product",
+          attributes: ["product_id", "product_name"],
         },
       ],
-      order: [["createdAt", "DESC"]],
-      limit: limitNum,
-      offset: offset,
-      distinct: true,
+      order: [["viewed_at", "DESC"]],
     });
 
-    const responseData = cartItems.map((item) => {
-      const plainItem = item.toJSON();
-      if (item.product) {
-        plainItem.product = parseProductJSONFields(item.product);
-        // Remap the eager-loaded association from 'User' (as defined in the model)
-        // to 'user' (as expected by the frontend).
-        if (plainItem.User) {
-          plainItem.user = plainItem.User;
-          delete plainItem.User;
-        }
+    const formattedViews = views.map((view) => {
+      const plainView = view.get({ plain: true });
+      if (!plainView.User) {
+        plainView.User = {
+          user_name: "Guest",
+          user_email: "Pengunjung tidak login",
+        };
       }
-      // Remap the eager-loaded association from 'User' (as defined in the model)
-      // to 'user' (as expected by the frontend).
-      if (plainItem.User) {
-        plainItem.user = plainItem.User;
-        delete plainItem.User;
-      }
-      return plainItem;
+      return plainView;
     });
 
-    res.status(200).json({
-      data: responseData,
-      totalItems: count,
-      totalPages: Math.ceil(count / limitNum),
-      currentPage: pageNum,
-    });
+    res.status(200).json(formattedViews);
   } catch (error) {
-    console.error("Error getting all cart items:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error fetching product viewers:", error);
+    res.status(500).json({ message: "Gagal mengambil data pengunjung." });
   }
 };
 
 /**
- * @description Mengambil ringkasan data analitik untuk keranjang belanja.
- * @route GET /api/analytics/cart-summary
+ * @description Mengambil daftar pengguna yang menambahkan produk tertentu ke keranjang.
+ * @route GET /api/analytics/top-products/:productId/cart-adds
  * @access Admin
  */
-exports.getCartAnalyticsSummary = async (req, res) => {
+exports.getProductCartAdds = async (req, res) => {
+  const { productId } = req.params;
+  const dateRange = getDateRange(req.query);
+
   try {
-    const totalActiveCarts = await CartItem.count({
-      distinct: true,
-      col: "user_id",
+    const cartAdds = await CartItem.findAll({
+      where: {
+        product_id: productId,
+        createdAt: dateRange,
+      },
+      include: [{ 
+        model: User, 
+        as: "User",
+        attributes: ["user_id", "user_email", "user_name"],
+        required: false, // Allow cart items without users (guest checkout)
+      }],
+      order: [["createdAt", "DESC"]],
     });
 
-    const totalItemsInCart = await CartItem.sum("quantity");
-
-    const totalValueResult = await CartItem.findAll({
-      attributes: [
-        "quantity",
-        [sequelize.col("product.product_price"), "price"],
-      ],
-      include: [
-        {
-          model: Product,
-          as: "product",
-          attributes: [],
-          required: true,
-        },
-      ],
-      raw: true,
-    });
-    const totalValueInCart = totalValueResult.reduce(
-      (sum, item) => sum + item.quantity * item.price,
-      0
-    );
-
-    const topProductsByFrequency = await CartItem.findAll({
-      attributes: [
-        "product_id",
-        [
-          sequelize.fn("COUNT", sequelize.col("CartItem.product_id")),
-          "frequency",
-        ],
-      ],
-      include: [
-        {
-          model: Product,
-          as: "product",
-          attributes: ["product_id", "product_name", "product_pictures"],
-        },
-      ],
-      group: ["CartItem.product_id", "product.product_id"],
-      order: [[sequelize.col("frequency"), "DESC"]],
-      limit: 5,
-    });
-
-    const parseTopProducts = (items, countKey) =>
-      items.map((item) => {
-        const plainItem = item.toJSON();
-        return {
-          ...parseProductJSONFields(plainItem.product),
-          [countKey]: parseInt(plainItem[countKey], 10),
+    const formattedCartAdds = cartAdds.map((cartAdd) => {
+      const plainCartAdd = cartAdd.get({ plain: true });
+      if (!plainCartAdd.User) {
+        plainCartAdd.User = {
+          user_name: "Guest",
+          user_email: "Pengunjung tidak login",
         };
-      });
-
-    res.status(200).json({
-      totalActiveCarts,
-      totalItemsInCart: totalItemsInCart || 0,
-      totalValueInCart,
-      topProductsByFrequency: parseTopProducts(
-        topProductsByFrequency,
-        "frequency"
-      ),
+      }
+      return plainCartAdd;
     });
+
+    res.status(200).json(formattedCartAdds);
   } catch (error) {
-    console.error("Error fetching cart analytics summary:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("Error fetching product cart adds:", error);
+    res.status(500).json({ message: "Gagal mengambil data keranjang." });
   }
 };

@@ -1,6 +1,26 @@
-const { Conversation, Message, User, sequelize } = require("../models");
+const {
+  Conversation,
+  Message,
+  User,
+  Product,
+  sequelize,
+} = require("../models");
 const { getToken } = require("next-auth/jwt");
 const { Op } = require("sequelize");
+
+const parseProductPictures = (product) => {
+  if (
+    product &&
+    product.product_pictures &&
+    typeof product.product_pictures === "string"
+  ) {
+    try {
+      product.product_pictures = JSON.parse(product.product_pictures);
+    } catch (e) {
+      product.product_pictures = [];
+    }
+  }
+};
 
 const getUserIdFromToken = async (req) => {
   const token = await getToken({
@@ -25,7 +45,13 @@ exports.getOrCreateConversation = async (req, res) => {
         {
           model: Message,
           as: "messages",
-          include: [{ model: User, as: "sender" }],
+          include: [
+            { model: User, as: "sender" },
+            {
+              model: Product,
+              as: "product",
+            },
+          ],
         },
       ],
       order: [[{ model: Message, as: "messages" }, "createdAt", "ASC"]],
@@ -39,7 +65,16 @@ exports.getOrCreateConversation = async (req, res) => {
       },
     });
 
+    // Parse product JSON fields if they exist in messages
     const conversationJSON = conversation.toJSON();
+    if (conversationJSON.messages) {
+      conversationJSON.messages = conversationJSON.messages.map((msg) => {
+        if (msg.product) {
+          parseProductPictures(msg.product);
+        }
+        return msg;
+      });
+    }
     conversationJSON.unreadCount = unreadCount;
 
     res.status(200).json(conversationJSON);
@@ -129,8 +164,7 @@ exports.sendMessage = async (req, res) => {
     const senderId = await getUserIdFromToken(req);
     if (!senderId) return res.status(401).json({ message: "Unauthorized" });
 
-    const { conversationId, content } = req.body;
-    const adminId = 1; // Asumsi ID admin selalu 1
+    const { conversationId, content, product_id } = req.body;
 
     if (!content || !conversationId) {
       return res
@@ -151,6 +185,7 @@ exports.sendMessage = async (req, res) => {
         senderId,
         sender_role: "user",
         content,
+        product_id: product_id || null,
       },
       { transaction: t }
     );
@@ -161,14 +196,27 @@ exports.sendMessage = async (req, res) => {
 
     await t.commit();
 
-    // Hapus emit ke Socket.IO
-    // const receiverId =
-    //   senderId === conversation.userId ? adminId : conversation.userId;
-    // req.io
-    //   .to(receiverId.toString())
-    //   .emit("receive_message", { ...message.get(), conversationId });
+    // Ambil kembali pesan yang baru dibuat dengan data produknya untuk dikirim ke client
+    const newMessage = await Message.findByPk(message.id, {
+      include: [
+        {
+          model: User,
+          as: "sender",
+          attributes: ["user_id", "user_name", "user_photo"],
+        },
+        {
+          model: Product,
+          as: "product",
+        },
+      ],
+    });
 
-    res.status(201).json(message);
+    const newMessageJSON = newMessage.toJSON();
+    if (newMessageJSON.product) {
+      parseProductPictures(newMessageJSON.product);
+    }
+
+    res.status(201).json(newMessageJSON);
   } catch (error) {
     await t.rollback();
     console.error("Error sending message:", error);
@@ -188,7 +236,9 @@ exports.getNewMessages = async (req, res) => {
     const { conversationId, lastMessageId } = req.query;
 
     if (!conversationId || !lastMessageId) {
-      return res.status(400).json({ message: "Conversation ID dan Last Message ID diperlukan." });
+      return res
+        .status(400)
+        .json({ message: "Conversation ID dan Last Message ID diperlukan." });
     }
 
     // Cari pesan baru yang ID-nya lebih besar dari lastMessageId
@@ -203,45 +253,23 @@ exports.getNewMessages = async (req, res) => {
           as: "sender",
           attributes: ["user_id", "user_name", "user_photo"],
         },
+        {
+          model: Product,
+          as: "product",
+        },
       ],
       order: [["createdAt", "ASC"]],
     });
 
-    res.status(200).json(newMessages);
+    const messagesJSON = newMessages.map((msg) => {
+      const msgJSON = msg.toJSON();
+      if (msgJSON.product) parseProductPictures(msgJSON.product);
+      return msgJSON;
+    });
+
+    res.status(200).json(messagesJSON);
   } catch (error) {
     console.error("Error polling for new messages:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-}
-
-exports.getNewMessagesAdmin = async (req, res) => {
-  try {
-    // Admin ID sudah diverifikasi oleh authMiddleware, jadi tidak perlu cek manual.
-    const { conversationId, lastMessageId } = req.query;
-
-    if (!conversationId || !lastMessageId) {
-      return res.status(400).json({ message: "Conversation ID dan Last Message ID diperlukan." });
-    }
-
-    // Cari pesan baru yang ID-nya lebih besar dari lastMessageId
-    const newMessages = await Message.findAll({
-      where: {
-        conversationId: conversationId,
-        id: { [Op.gt]: lastMessageId },
-      },
-      include: [
-        {
-          model: User,
-          as: "sender",
-          attributes: ["user_id", "user_name", "user_photo"],
-        },
-      ],
-      order: [["createdAt", "ASC"]],
-    });
-
-    res.status(200).json(newMessages);
-  } catch (error) {
-    console.error("Error polling for new admin messages:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -252,7 +280,9 @@ exports.getNewMessagesAdmin = async (req, res) => {
     const { conversationId, lastMessageId } = req.query;
 
     if (!conversationId || !lastMessageId) {
-      return res.status(400).json({ message: "Conversation ID dan Last Message ID diperlukan." });
+      return res
+        .status(400)
+        .json({ message: "Conversation ID dan Last Message ID diperlukan." });
     }
 
     // Cari pesan baru yang ID-nya lebih besar dari lastMessageId
@@ -267,11 +297,21 @@ exports.getNewMessagesAdmin = async (req, res) => {
           as: "sender",
           attributes: ["user_id", "user_name", "user_photo"],
         },
+        {
+          model: Product,
+          as: "product",
+        },
       ],
       order: [["createdAt", "ASC"]],
     });
 
-    res.status(200).json(newMessages);
+    const messagesJSON = newMessages.map((msg) => {
+      const msgJSON = msg.toJSON();
+      if (msgJSON.product) parseProductPictures(msgJSON.product);
+      return msgJSON;
+    });
+
+    res.status(200).json(messagesJSON);
   } catch (error) {
     console.error("Error polling for new admin messages:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -284,7 +324,9 @@ exports.getConversationUpdatesAdmin = async (req, res) => {
   try {
     const { lastFetchTimestamp } = req.query;
     if (!lastFetchTimestamp) {
-      return res.status(400).json({ message: "lastFetchTimestamp is required." });
+      return res
+        .status(400)
+        .json({ message: "lastFetchTimestamp is required." });
     }
 
     const unreadCountSubquery = sequelize.literal(`(
@@ -314,12 +356,25 @@ exports.getConversationUpdatesAdmin = async (req, res) => {
           as: "messages",
           limit: 1,
           order: [["createdAt", "DESC"]],
+          include: [{ model: Product, as: "product" }],
         },
       ],
       order: [["lastMessageAt", "DESC"]],
     });
 
-    res.status(200).json(updatedConversations);
+    const conversationsJSON = updatedConversations.map((convo) => {
+      const convoJSON = convo.toJSON();
+      if (
+        convoJSON.messages &&
+        convoJSON.messages[0] &&
+        convoJSON.messages[0].product
+      ) {
+        parseProductPictures(convoJSON.messages[0].product);
+      }
+      return convoJSON;
+    });
+
+    res.status(200).json(conversationsJSON);
   } catch (error) {
     console.error("Error getting conversation updates for admin:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -350,11 +405,25 @@ exports.getAllConversationsAdmin = async (req, res) => {
           as: "messages",
           limit: 1,
           order: [["createdAt", "DESC"]],
+          include: [{ model: Product, as: "product" }],
         },
       ],
       order: [["lastMessageAt", "DESC"]],
     });
-    res.status(200).json(conversations);
+
+    const conversationsJSON = conversations.map((convo) => {
+      const convoJSON = convo.toJSON();
+      if (
+        convoJSON.messages &&
+        convoJSON.messages[0] &&
+        convoJSON.messages[0].product
+      ) {
+        parseProductPictures(convoJSON.messages[0].product);
+      }
+      return convoJSON;
+    });
+
+    res.status(200).json(conversationsJSON);
   } catch (error) {
     console.error("Error getting all conversations for admin:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -393,10 +462,21 @@ exports.getMessagesForConversationAdmin = async (req, res) => {
           as: "sender",
           attributes: ["user_id", "user_name", "user_photo"],
         },
+        {
+          model: Product,
+          as: "product",
+        },
       ],
       order: [["createdAt", "ASC"]],
     });
-    res.status(200).json(messages);
+
+    const messagesJSON = messages.map((msg) => {
+      const msgJSON = msg.toJSON();
+      if (msgJSON.product) parseProductPictures(msgJSON.product);
+      return msgJSON;
+    });
+
+    res.status(200).json(messagesJSON);
   } catch (error) {
     console.error("Error getting messages for admin:", error);
     res.status(500).json({ message: "Internal server error" });
