@@ -33,11 +33,13 @@ const ConversationList = ({
               <p className="font-semibold text-gray-800 truncate">
                 {convo.user?.user_name || "Pengguna"}
               </p>
-              <p className="text-sm text-gray-500 truncate">
+              <p className="text-sm text-gray-500 truncate max-w-[calc(100vw-180px)] md:max-w-full">
                 {convo.messages?.[0]?.content || "Belum ada pesan."}
               </p>
             </div>
-            <div className="flex flex-col items-end self-start space-y-1">
+            <div
+              className="flex flex-col items-end self-start space-y-1 flex-shrink-0"
+            >
               <span className="text-xs text-gray-400">
                 {new Date(convo.lastMessageAt).toLocaleTimeString("id-ID", {
                   hour: "2-digit",

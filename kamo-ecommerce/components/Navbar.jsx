@@ -13,16 +13,15 @@ import {
   FaSignOutAlt,
   FaHeart,
   FaShoppingCart,
+  FaTimes,
 } from "react-icons/fa";
+import { AnimatePresence, motion } from "framer-motion";
 
 const Navbar = () => {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const [searchResults, setSearchResults] = useState([]);
-  const [showResults, setShowResults] = useState(false);
-  const [loadingSearch, setLoadingSearch] = useState(false);
   const { user, profile, userLogout } = useUserAuth();
   const { admin, logoutAdmin } = useAuth();
   const { cartCount } = useCart();
@@ -30,38 +29,12 @@ const Navbar = () => {
   const [settings, setSettings] = useState(null);
   const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-  // Debounce untuk menunda pencarian API
-  useEffect(() => {
-    if (searchTerm.trim() === "") {
-      setSearchResults([]);
-      setShowResults(false);
-      return;
-    }
-
-    setLoadingSearch(true);
-    setShowResults(true);
-    const delayDebounceFn = setTimeout(async () => {
-      try {
-        const res = await api.get(`/products?search=${searchTerm}&limit=5`);
-        setSearchResults(res.data.data || []);
-      } catch (error) {
-        console.error("Failed to fetch search results:", error);
-        setSearchResults([]);
-      } finally {
-        setLoadingSearch(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
-
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (searchTerm.trim()) {
       router.push(
         `/all-products?search=${encodeURIComponent(searchTerm.trim())}`
       );
-      setShowResults(false);
     }
   };
 
@@ -101,7 +74,7 @@ const Navbar = () => {
       {/* Desktop Navigation Links */}
       <div className="hidden md:flex lg:flex items-center gap-6 font-medium text-sm text-gray-500">
         <Link href="/" className="hover:text-accent transition-colors">
-          Home
+          Beranda
         </Link>
         <Link
           href="/all-products"
@@ -119,68 +92,48 @@ const Navbar = () => {
 
       {/* Desktop Search and User Actions */}
       <div className="hidden md:flex items-center gap-4 lg:gap-6 relative">
-        {/* Search Input */}
-        <form onSubmit={handleSearchSubmit} className="relative w-48 lg:w-64">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
-            <FaSearch />
-          </div>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onBlur={() => setTimeout(() => setShowResults(false), 150)}
-            onFocus={() => searchTerm.trim() && setShowResults(true)}
-            placeholder="Cari produk..."
-            className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm w-full focus:outline-none focus:ring-1 focus:ring-accent"
-          />
-          {/* Search Results Dropdown */}
-          {showResults && (
-            <div className="absolute top-full mt-2 bg-white w-96 shadow-lg border rounded-md z-50">
-              {loadingSearch ? (
-                <p className="p-3 text-gray-500 text-sm text-center">
-                  Mencari...
-                </p>
-              ) : searchResults.length > 0 ? (
-                searchResults.map((product) => (
-                  <div
-                    key={product.product_id}
-                    onClick={() => {
-                      router.push(`/product/${product.product_id}`);
-                      setShowResults(false);
-                    }}
-                    className="flex items-start gap-3 p-3 hover:bg-gray-50 cursor-pointer transition"
-                  >
-                    <Image
-                      src={
-                        product.product_pictures &&
-                        product.product_pictures.length > 0
-                          ? process.env.NEXT_PUBLIC_BACKEND_URL +
-                            product.product_pictures[0]
-                          : assets.product_placeholder
-                      }
-                      alt={product.product_name}
-                      width={50}
-                      height={50}
-                      className="rounded-md object-cover"
+        {/* Search Input - Modified to look like mobile */}
+        <div className="">
+          <button
+            onClick={() => setMobileSearchOpen((prev) => !prev)}
+            className="p-1 z-20 cursor-pointer"
+          >
+            {mobileSearchOpen ? (
+              <FaTimes className="w-5 h-5 text-gray-500" />
+            ) : (
+              <FaSearch className="w-5 h-5 text-gray-500" />
+            )}
+          </button>
+
+          {/* Search Dropdown Panel - Similar to mobile */}
+          <AnimatePresence>
+            {mobileSearchOpen && (
+              <motion.div
+                initial={{ y: -20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -20, opacity: 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+                className="absolute top-14 right-0 w-96 bg-white shadow-lg p-4 z-0 border rounded-lg border-transparent"
+              >
+                <form
+                  onSubmit={handleSearchSubmit}
+                  className="w-full flex items-center gap-2"
+                >
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Cari produk..."
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                      autoFocus
                     />
-                    <div>
-                      <p className="font-medium text-sm">
-                        {product.product_name}
-                      </p>
-                      <p className="text-xs text-gray-500 line-clamp-2">
-                        {product.product_description}
-                      </p>
-                    </div>
                   </div>
-                ))
-              ) : (
-                <p className="p-3 text-gray-500 text-sm text-center">
-                  Produk tidak ditemukan
-                </p>
-              )}
-            </div>
-          )}
-        </form>
+                </form>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* User Actions */}
         {user || admin ? (
@@ -226,7 +179,7 @@ const Navbar = () => {
               className="hidden lg:flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-full text-sm hover:bg-red-600"
             >
               <FaSignOutAlt />
-              <span>Logout</span>
+              <span>Keluar</span>
             </button>
           </div>
         ) : (
@@ -234,108 +187,33 @@ const Navbar = () => {
             onClick={() => router.push("/account")}
             className="bg-accent text-white px-4 py-2 rounded-full text-sm hover:bg-accent/90"
           >
-            Masuk / Daftar
+            Masuk
           </button>
         )}
       </div>
 
-      {/* Mobile Menu Button (shown on mobile and iPad) */}
+      {/* Mobile Icons */}
       <div className="flex md:hidden items-center gap-4">
-        {/* Profile button only on mobile (hidden on iPad) */}
-        {user && (
-          <Link href="/profile" className="md:hidden hidden">
-            <Image
-              src={profile?.user_photo || user.image || assets.user_icon}
-              alt="Profil"
-              width={28}
-              height={28}
-              className="rounded-full object-cover"
-            />
-          </Link>
-        )}
-
-        {/* Toggle search icon */}
-        <div className="flex items-center gap-2">
-          <form
-            onSubmit={handleSearchSubmit}
-            className="flex items-center"
-            style={{ minWidth: 0 }}
-          >
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cari produk..."
-              className={`
-        transition-all duration-300
-        bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm
-        focus:outline-none focus:ring-1 focus:ring-accent
-        ${mobileSearchOpen ? "w-40 ml-2 opacity-100" : "w-0 ml-0 opacity-0"}
-      `}
-              style={{
-                minWidth: 0,
-                paddingLeft: mobileSearchOpen ? undefined : 0,
-                paddingRight: mobileSearchOpen ? undefined : 0,
-              }}
-              autoFocus={mobileSearchOpen}
-              onBlur={() => setMobileSearchOpen(false)}
-            />
-            <FaSearch
-              className="w-4 h-4 text-gray-500 cursor-pointer ml-2 font-regular"
-              onClick={() => setMobileSearchOpen((v) => !v)}
-            />
-            {/* Search Results Dropdown */}
-            {showResults && (
-              <div className="absolute top-full mt-2 bg-white w-96 shadow-lg border rounded-md z-50 right-2">
-                {loadingSearch ? (
-                  <p className="p-3 text-gray-500 text-sm text-center">
-                    Mencari...
-                  </p>
-                ) : searchResults.length > 0 ? (
-                  searchResults.map((product) => (
-                    <div
-                      key={product.product_id}
-                      onClick={() => {
-                        router.push(`/product/${product.product_id}`);
-                        setShowResults(false);
-                      }}
-                      className="flex items-start gap-3 p-3 hover:bg-gray-50 cursor-pointer transition"
-                    >
-                      <Image
-                        src={
-                          product.product_pictures &&
-                          product.product_pictures.length > 0
-                            ? process.env.NEXT_PUBLIC_BACKEND_URL +
-                              product.product_pictures[0]
-                            : assets.product_placeholder
-                        }
-                        alt={product.product_name}
-                        width={50}
-                        height={50}
-                        className="rounded-md object-cover"
-                      />
-                      <div>
-                        <p className="font-medium text-sm">
-                          {product.product_name}
-                        </p>
-                        <p className="text-xs text-gray-500 line-clamp-2">
-                          {product.product_description}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="p-3 text-gray-500 text-sm text-center">
-                    Produk tidak ditemukan
-                  </p>
-                )}
-              </div>
-            )}
-          </form>
-        </div>
-
+        {/* Search Icon */}
         <button
-          onClick={() => setMenuOpen(!menuOpen)}
+          onClick={() => {
+            setMobileSearchOpen((prev) => !prev);
+            setMenuOpen(false); // Tutup menu saat membuka pencarian
+          }}
+          className="p-1 z-20"
+        >
+          {mobileSearchOpen ? (
+            <FaTimes className="w-5 h-5 text-gray-600" />
+          ) : (
+            <FaSearch className="w-5 h-5 text-gray-600" />
+          )}
+        </button>
+        {/* Hamburger Icon */}
+        <button
+          onClick={() => {
+            setMenuOpen(!menuOpen);
+            setMobileSearchOpen(false); // Tutup pencarian saat membuka menu
+          }}
           className="z-20"
           aria-label="Toggle menu"
         >
@@ -371,6 +249,35 @@ const Navbar = () => {
         </button>
       </div>
 
+      {/* Mobile Search Dropdown Panel */}
+      <AnimatePresence>
+        {mobileSearchOpen && (
+          <motion.div
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -20, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            className="absolute top-full left-0 right-0 bg-white shadow-lg p-4 md:hidden z-10 border-t"
+          >
+            <form
+              onSubmit={handleSearchSubmit}
+              className="w-full flex items-center gap-2"
+            >
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Cari produk..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                  autoFocus
+                />
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Mobile Menu Dropdown */}
       {menuOpen && (
         <div className="absolute top-full right-0 w-full bg-white shadow-lg md:hidden flex flex-col items-center text-gray-500 font-medium text-lg">
@@ -378,7 +285,7 @@ const Navbar = () => {
             href="/"
             className="w-full text-center py-4 hover:bg-gray-100 hover:text-accent"
           >
-            Home
+            Beranda
           </Link>
           <Link
             href="/all-products"
@@ -406,7 +313,7 @@ const Navbar = () => {
                 href="/profile"
                 className="w-full text-center py-4 hover:bg-gray-100 hover:text-accent md:hidden"
               >
-                Profile
+                Profil
               </Link>
             </>
           )}
@@ -418,14 +325,14 @@ const Navbar = () => {
                 className="w-full bg-red-500 text-white flex justify-center gap-2 px-5 py-2.5 rounded-full text-base hover:bg-red-600"
               >
                 <FaSignOutAlt />
-                <span>Logout</span>
+                <span>Keluar</span>
               </button>
             ) : (
               <button
                 onClick={() => router.push("/account")}
                 className="w-full bg-accent text-white flex justify-center gap-2 px-5 py-2.5 rounded-full text-base hover:bg-accent/90"
               >
-                Masuk / Daftar
+                Masuk
               </button>
             )}
           </div>

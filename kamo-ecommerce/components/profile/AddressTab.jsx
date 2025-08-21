@@ -21,7 +21,6 @@ const AddressTab = () => {
     if (window.confirm("Apakah Anda yakin ingin menghapus alamat ini?")) {
       try {
         const res = await api.delete(`/auth/address/${addressId}`);
-        console.log(res);
         toast.success("Alamat berhasil dihapus.");
         userProfile();
       } catch (error) {

@@ -141,7 +141,7 @@ const CheckoutPage = () => {
           weight: totalWeightKg,
         });
 
-        console.log("JNE Shipping Rates Response:", res.data);
+        // console.log("JNE Shipping Rates Response:", res.data);
 
         const filteredData = res.data.filter(
           (opt) =>

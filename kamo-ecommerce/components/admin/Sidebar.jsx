@@ -18,7 +18,6 @@ import {
   FaStar,
   FaImages,
   FaChartLine,
-  FaChartArea,
   FaCartPlus,
   FaChevronLeft,
   FaTimes,
@@ -52,62 +51,57 @@ const SideBar = ({
     {
       title: "Customer",
       items: [
-        { name: "Orders", path: "/admin/orders", icon: <FaShoppingCart /> },
+        { name: "Pesanan", path: "/admin/orders", icon: <FaShoppingCart /> },
         {
-          name: "Orders Tiktok",
+          name: "Pesanan Tiktok",
           path: "/admin/orders-tiktok",
           icon: <FaCartPlus />,
         },
-        { name: "Chat", path: "/admin/chat", icon: <FaEnvelope /> },
-        { name: "Reviews", path: "/admin/reviews", icon: <FaComment /> },
+        { name: "Pesan", path: "/admin/chat", icon: <FaEnvelope /> },
+        { name: "Ulasan", path: "/admin/reviews", icon: <FaComment /> },
       ],
     },
     {
-      title: "Products",
+      title: "Produk",
       items: [
         {
-          name: "Add Product",
+          name: "Tambah Produk",
           path: "/admin/add-product",
           icon: <FaRegPlusSquare />,
         },
         {
-          name: "Product List",
+          name: "Daftar Produk",
           path: "/admin/product-list",
           icon: <FaListAlt />,
         },
         {
-          name: "Analytics Product Views",
+          name: "Analisa Produk",
           path: "/admin/analytics",
           icon: <FaChartLine />,
         },
+        { name: "Kategori", path: "/admin/category", icon: <FaBookmark /> },
         {
-          name: "Analytics Cart",
-          path: "/admin/analytics-cart",
-          icon: <FaChartArea />,
-        },
-        { name: "Category", path: "/admin/category", icon: <FaBookmark /> },
-        {
-          name: "Featured Products",
+          name: "Produk Unggulan",
           path: "/admin/featured-product",
           icon: <FaStar />,
         },
       ],
     },
     {
-      title: "Content",
+      title: "Konten",
       items: [
         {
-          name: "Contents",
+          name: "Konten",
           path: "/admin/content",
           icon: <BiSolidBookContent />,
         },
         {
-          name: "Homepage Manager",
+          name: "Pengaturan Beranda",
           path: "/admin/homepage-manager",
           icon: <FaImages />,
         },
         {
-          name: "Footer Setting",
+          name: "Pengaturan Footer",
           path: "/admin/footer-setting",
           icon: <FaEdit />,
         },
@@ -115,8 +109,8 @@ const SideBar = ({
     },
 
     {
-      title: "Settings",
-      items: [{ name: "Settings", path: "/admin/settings", icon: <FaCog /> }],
+      title: "Pengaturan",
+      items: [{ name: "Pengaturan", path: "/admin/settings", icon: <FaCog /> }],
     },
   ];
 
@@ -221,12 +215,12 @@ const SideBar = ({
         <div className="mt-auto p-2 border-t border-gray-200">
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center gap-2 p-2 rounded-lg bg-red-600 text-white hover:bg-red-700 ${
+            className={`w-full flex items-center gap-2 p-2 rounded-lg bg-red-500 text-white hover:bg-red-700 cursor-pointer ${
               isExpanded ? "justify-start px-3" : "justify-center"
             }`}
           >
             <FaSignOutAlt />
-            <span className={`${!isExpanded && "md:hidden"}`}>Logout</span>
+            <span className={`${!isExpanded && "md:hidden"}`}>Keluar</span>
           </button>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { assets } from "../assets/assets";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useUserAuth } from "@/contexts/UserAuthContext";
 import { FaHeart, FaShoppingCart } from "react-icons/fa";
 import { FiStar } from "react-icons/fi";
@@ -12,6 +12,7 @@ const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 const ProductCard = ({ product }) => {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, wishlist, addToWishlist, removeFromWishlist } = useUserAuth();
   const { addToCart } = useCart();
   const isOutOfStock = product.product_stock <= 0;
@@ -24,7 +25,7 @@ const ProductCard = ({ product }) => {
   const handleWishlistClick = (e) => {
     e.stopPropagation();
     if (!user) {
-      router.push("/account");
+      router.push(`/account?callbackUrl=${pathname}`);
       return;
     }
 
@@ -49,6 +50,7 @@ const ProductCard = ({ product }) => {
         position: "top-center",
         style: { background: "#ff4444", color: "#fff" },
       });
+      router.push(`/account?callbackUrl=${pathname}`);
       return;
     }
 
@@ -97,6 +99,19 @@ const ProductCard = ({ product }) => {
     >
       {/* Product Image */}
       <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden mb-3">
+        {/* Wishlist Button */}
+        <button
+          onClick={handleWishlistClick}
+          className="absolute top-2 left-2 z-1 p-2 bg-white rounded-full shadow-md"
+          aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+        >
+          <FaHeart
+            className={`w-4 h-4 transition-colors ${
+              isWishlisted ? "text-red-500" : "text-gray-400 hover:text-red-500"
+            }`}
+          />
+        </button>
+
         <Image
           src={
             product.product_pictures?.[0]
@@ -136,27 +151,12 @@ const ProductCard = ({ product }) => {
 
         {/* Price */}
         <div className="flex items-end justify-between mt-auto">
-          <p className="text-md lg:text-lg font-bold text-gray-900">
+          <p className="text-sm md:text-sm lg:text-lg font-bold text-gray-900">
             Rp {product.product_price?.toLocaleString("id-ID")}
           </p>
 
           {/* Action Buttons */}
           <div className="flex gap-2">
-            {/* Wishlist Button (Always visible on mobile) */}
-            <button
-              onClick={handleWishlistClick}
-              className="p-2 bg-white rounded-full shadow-sm md:opacity-0 md:group-hover:opacity-100 transition-opacity"
-              aria-label={
-                isWishlisted ? "Remove from wishlist" : "Add to wishlist"
-              }
-            >
-              <FaHeart
-                className={`w-4 h-4 ${
-                  isWishlisted ? "text-red-500" : "text-gray-300"
-                }`}
-              />
-            </button>
-
             {/* Buy Now Button */}
             <button
               onClick={handleBuyNowClick}

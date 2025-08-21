@@ -74,7 +74,7 @@ const ChatWidget = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.4 }}
             className="fixed lg:bottom-6 md:bottom-6 bottom-0 lg:right-5 md:right-5 right-0 lg:w-96 md:w-96 w-full lg:h-[44rem] md:h-[42rem] h-full bg-white rounded-lg shadow-2xl flex flex-col z-50 border border-gray-200"
           >
             {/* Header with brand info */}
@@ -130,21 +130,60 @@ const ChatWidget = () => {
 
               {/* User messages */}
               {messages.map((msg) => {
-                if (msg.type === "product_inquiry") {
+                // Jika pesan memiliki data produk, tampilkan kartu DAN pesannya.
+                if (msg.product) {
                   return (
-                    <div key={msg.id} className="flex justify-center">
-                      <ProductInfoCard
-                        product={msg.product}
-                        onClick={() => {
-                          router.push(`/product/${msg.product.id}`);
-                          closeChat();
-                        }}
-                        className="w-full max-w-xs border border-gray-200"
-                      />
+                    <div key={msg.id} className="space-y-2">
+                      <div className="flex justify-center">
+                        <ProductInfoCard
+                          product={msg.product}
+                          onClick={() => {
+                            router.push(`/product/${msg.product.product_id}`);
+                            closeChat();
+                          }}
+                          className="w-full max-w-xs border border-gray-200"
+                        />
+                      </div>
+                      {/* Pesan teks yang menyertainya */}
+                      <div
+                        className={`flex items-end ${
+                          msg.sender_role === "user"
+                            ? "justify-end"
+                            : "justify-start"
+                        }`}
+                      >
+                        <div
+                          className={`max-w-xs md:max-w-md px-4 py-2 rounded-xl shadow-sm ${
+                            msg.sender_role === "user"
+                              ? "bg-accent text-white rounded-br-none"
+                              : "bg-white text-gray-800 rounded-bl-none border border-gray-200"
+                          }`}
+                        >
+                          <p
+                            className="text-sm"
+                            style={{
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {msg.content}
+                          </p>
+                          <div className="text-right text-xs mt-1 opacity-70">
+                            {new Date(msg.createdAt).toLocaleTimeString(
+                              "id-ID",
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   );
                 }
 
+                // Pesan biasa tanpa produk
                 return (
                   <div
                     key={msg.id}
@@ -201,8 +240,9 @@ const ChatWidget = () => {
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Type a message..."
-                  className="flex-1 p-3 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="flex-1 p-3 border border-gray-300 rounded-full text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-accent"
                   disabled={!isChatReady}
+                  style={{ fontSize: "16px" }} // Tambahkan ini
                 />
                 <button
                   type="submit"

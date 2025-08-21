@@ -10,9 +10,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useUserAuth } from "@/contexts/UserAuthContext";
 import api from "@/service/api";
 import Loading from "@/components/Loading";
+import { useSearchParams } from "next/navigation";
 
 const Account = () => {
   const { router } = useAppContext();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl");
   const { admin, loading: adminLoading } = useAuth();
   const [role, setRole] = useState("user");
   const [data, setData] = useState({
@@ -52,9 +55,9 @@ const Account = () => {
     // Setelah loading selesai, periksa status login
     if (!adminLoading && !userLoading) {
       if (admin) router.replace("/admin");
-      if (user) router.replace("/");
+      if (user) router.replace(callbackUrl || "/");
     }
-  }, [admin, user, adminLoading, userLoading, router]);
+  }, [admin, user, adminLoading, userLoading, router, callbackUrl]);
 
   const handleAdminLogin = async (e) => {
     e.preventDefault();
@@ -80,7 +83,7 @@ const Account = () => {
   };
 
   const handleGoogleSignIn = async () => {
-    await signIn("google"); // Memulai alur autentikasi Google OAuth
+    await signIn("google", { callbackUrl: callbackUrl || "/" }); // Memulai alur autentikasi Google OAuth
   };
   
   if (adminLoading || userLoading) {
@@ -89,15 +92,29 @@ const Account = () => {
 
   return (
     <div className="min-h-screen w-full flex bg-white relative">
-      {/* Back to Home Button */}
+      {/* Left Column: Image Slider */}
+      <div className="hidden md:block w-1/2 relative">
+        {sliderImages.map((imageSrc, index) => (
+          <Image
+            key={index}
+            src={imageSrc}
+            alt={`Kampoeng Moge gallery image ${index + 1}`}
+            fill
+            style={{ objectFit: "cover" }}
+            sizes="50vw"
+            priority
+            className={`transition-opacity duration-1000 ease-in-out absolute inset-0 ${
+              index === currentImageIndex ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        ))}
+      </div>
 
-      {/* Added a subtle background to the whole page */}
-      {/* Left Column: Form */}
+      {/* Right Column: Form */}
       <div className="w-full md:w-1/2 flex items-center justify-center p-4 md:p-8">
         {" "}
         {/* Centering content within this half */}
         <div className="max-w-md w-full space-y-8 bg-white p-6 md:p-10 ">
-          {" "}
           {/* The actual form card */}
           <div>
             <Image
@@ -110,10 +127,10 @@ const Account = () => {
               onClick={() => router.push("/")}
             />
             <h2 className="mt-6 text-center text-3xl font-bold text-gray-700">
-              {role === "user" ? "Welcome!" : "Admin Sign In"}
+              {role === "user" ? "Selamat Datang!" : "Admin Panel"}
             </h2>
             <p className="mt-2 text-center text-sm text-gray-600">
-              Please select your role to continue
+              Pilih peran Anda untuk melanjutkan
             </p>
           </div>
           {/* Role Selector */}
@@ -130,7 +147,7 @@ const Account = () => {
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              User
+              Pengguna
             </button>
             <button
               type="button"
@@ -149,7 +166,7 @@ const Account = () => {
             // User Login (Google)
             <div className="text-center pt-2">
               <p className="text-gray-600 mb-6 text-sm">
-                Sign in or create an account securely with your Google account.
+                Masuk dengan akun Google Anda untuk melanjutkan.
               </p>
               <button
                 type="button"
@@ -159,7 +176,7 @@ const Account = () => {
                 <span className="mr-2 text-lg">
                   <FcGoogle />
                 </span>
-                Sign In with Google
+                Masuk dengan Google
               </button>
             </div>
           ) : (
@@ -205,7 +222,7 @@ const Account = () => {
                   type="submit"
                   className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-semibold rounded-md text-white bg-accent hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent transition-all duration-200 transform hover:-translate-y-0.5"
                 >
-                  Sign In
+                  Masuk sebagai Admin
                 </button>
               </div>
             </form>
@@ -217,23 +234,6 @@ const Account = () => {
             &larr; Kembali ke Beranda
           </button>{" "}
         </div>
-      </div>
-      {/* Right Column: Image Slider */}
-      <div className="hidden md:block w-1/2 relative">
-        {sliderImages.map((imageSrc, index) => (
-          <Image
-            key={index}
-            src={imageSrc}
-            alt={`Kampoeng Moge gallery image ${index + 1}`}
-            fill
-            style={{ objectFit: "cover" }}
-            sizes="50vw"
-            priority
-            className={`transition-opacity duration-1000 ease-in-out absolute inset-0 ${
-              index === currentImageIndex ? "opacity-100" : "opacity-0"
-            }`}
-          />
-        ))}
       </div>
     </div>
   );

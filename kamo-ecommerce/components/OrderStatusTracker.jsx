@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { FaCheck, FaBox, FaTruck, FaClipboardCheck } from "react-icons/fa";
 import api from "@/service/api";
 
@@ -12,63 +12,44 @@ const OrderStatusTracker = ({ orderId, status, shippingNumber }) => {
     { name: "Selesai", status: "completed", icon: <FaClipboardCheck /> },
   ];
 
-  // Simulasi state dengan data dari API
-  const [trackingInfo, setTrackingInfo] = useState({
-    cnote: {
-      cnote_no: "XXXXXXXXXXXXX",
-      pod_status: "DELIVERED",
-      last_status: "DELIVERED TO [WAWAN | 03-04-2022 13:31 | BANDUNG ]",
-      cnote_pod_date: "2022-04-03T13:31:00.000+07:00",
-    },
-    history: [
-      {
-        date: "02-04-2022 17:45",
-        desc: "SHIPMENT RECEIVED BY JNE COUNTER OFFICER AT [CIANJUR, CIANJUR]",
-        code: "RC1"
-      },
-      {
-        date: "02-04-2022 18:02",
-        desc: "PICKED UP BY COURIER [CIANJUR, CIANJUR]",
-        code: "PU1"
-      },
-      {
-        date: "02-04-2022 22:21",
-        desc: "PROCESSED AT SORTING CENTER [CIANJUR, SABANDAR]",
-        code: "OP2"
-      },
-      {
-        date: "03-04-2022 01:16",
-        desc: "RECEIVED AT ORIGIN GATEWAY  [BANDUNG]",
-        code: "TP1"
-      },
-      {
-        date: "03-04-2022 01:31",
-        desc: "RECEIVED AT WAREHOUSE   [TGG, AGEN SUKANAGARA]",
-        code: "IP1"
-      },
-      {
-        date: "03-04-2022 04:25",
-        desc: "SHIPMENT FORWARDED FROM TRANSIT CITY TO DESTINATION CITY [TGG, PAGELARAN]",
-        code: "OP3"
-      },
-      {
-        date: "03-04-2022 08:10",
-        desc: "WITH DELIVERY COURIER  [BANDUNG]",
-        code: "IP3"
-      },
-      {
-        date: "03-04-2022 13:31",
-        desc: "DELIVERED TO [WAWAN | 03-04-2022 13:31 | BANDUNG ]",
-        code: "D01"
-      }
-    ].reverse() // History sudah di-reverse seperti di kode asli
-  });
-
+  const [trackingInfo, setTrackingInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const fetchTrackingInfo = useCallback(async () => {
+    if (!shippingNumber) {
+      setTrackingInfo(null);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Asumsi endpoint untuk melacak AWB adalah `/shipping/track-awb/:awb`
+      const res = await api.get(`/shipping/track-awb/${shippingNumber}`);
+
+      // API mengembalikan riwayat secara kronologis, kita ingin menampilkan yang terbaru lebih dulu.
+      if (res.data && res.data.history) {
+        res.data.history.reverse();
+      }
+      setTrackingInfo(res.data);
+    } catch (err) {
+      setError(
+        err.response?.data?.message || "Gagal memuat riwayat pengiriman."
+      );
+      setTrackingInfo(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [shippingNumber]);
+
+  useEffect(() => {
+    fetchTrackingInfo();
+  }, [fetchTrackingInfo]);
+
   const statusOrder = ["pending", "processing", "shipped", "completed"];
-  const effectiveStatus = status === "cancellation_request" ? "processing" : status;
+  const effectiveStatus =
+    status === "cancellation_request" ? "processing" : status;
   const currentStatusIndex = statusOrder.indexOf(effectiveStatus);
 
   if (status === "cancelled") {
@@ -90,10 +71,11 @@ const OrderStatusTracker = ({ orderId, status, shippingNumber }) => {
 
       {shippingNumber && (
         <p className="text-sm text-gray-600 mb-4">
-          Nomor Resi: <span className="font-medium text-gray-800">{shippingNumber}</span>
+          Nomor Resi:{" "}
+          <span className="font-medium text-gray-800">{shippingNumber}</span>
         </p>
       )}
-      
+
       {/* Progress Bar */}
       <div className="flex items-start">
         {steps.map((step, index) => {
@@ -131,8 +113,12 @@ const OrderStatusTracker = ({ orderId, status, shippingNumber }) => {
 
       {/* Shipping History */}
       <div className="mt-8">
-        <h3 className="text-md font-semibold text-gray-700 mb-4">Riwayat Pengiriman</h3>
-        {isLoading && <p className="text-sm text-gray-500">Memuat riwayat...</p>}
+        <h3 className="text-md font-semibold text-gray-700 mb-4">
+          Riwayat Pengiriman
+        </h3>
+        {isLoading && (
+          <p className="text-sm text-gray-500">Memuat riwayat...</p>
+        )}
         {error && <p className="text-sm text-red-500">{error}</p>}
         {trackingInfo && trackingInfo.history && (
           <div className="relative pl-4 border-l-2 border-gray-200">
@@ -140,7 +126,9 @@ const OrderStatusTracker = ({ orderId, status, shippingNumber }) => {
               <div key={index} className="mb-6 relative">
                 <div
                   className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full ${
-                    index === 0 ? "bg-green-500 ring-4 ring-green-100" : "bg-gray-300"
+                    index === 0
+                      ? "bg-green-500 ring-4 ring-green-100"
+                      : "bg-gray-300"
                   }`}
                 ></div>
                 <div className="pl-4">
@@ -163,6 +151,15 @@ const OrderStatusTracker = ({ orderId, status, shippingNumber }) => {
             ))}
           </div>
         )}
+        {shippingNumber &&
+          !isLoading &&
+          !error &&
+          (!trackingInfo || !trackingInfo.history) && (
+            <p className="text-sm text-gray-500">
+              Riwayat pengiriman akan tersedia setelah paket diproses oleh
+              kurir.
+            </p>
+          )}
       </div>
     </div>
   );

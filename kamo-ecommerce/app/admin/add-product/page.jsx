@@ -29,6 +29,7 @@ const AddProduct = () => {
   const [description, setDescription] = useState("");
   const [sku, setSku] = useState("");
   const [price, setPrice] = useState("");
+  const [tiktokPrice, setTiktokPrice] = useState("");
   const [stock, setStock] = useState("");
   const [minOrder, setMinOrder] = useState("");
   const [condition, setCondition] = useState("Baru");
@@ -86,6 +87,12 @@ const AddProduct = () => {
     setPrice(formatNumber(raw));
   };
 
+  // Handler khusus untuk input harga TikTok agar selalu terformat
+  const handleTiktokPriceChange = (e) => {
+    const raw = e.target.value.replace(/\D/g, "");
+    setTiktokPrice(formatNumber(raw));
+  };
+
   // Konfigurasi modul untuk toolbar ReactQuill
   const modules = useMemo(
     () => ({
@@ -122,6 +129,7 @@ const AddProduct = () => {
     setIsSubmitting(true);
 
     const numericPrice = price.replace(/\./g, "");
+    const numericTiktokPrice = tiktokPrice.replace(/\./g, "");
 
     // --- START: Frontend Validation ---
     if (name.length < 25 || name.length > 255) {
@@ -184,6 +192,7 @@ const AddProduct = () => {
       formData.append("description", description);
       formData.append("sku", sku);
       formData.append("price", numericPrice);
+      formData.append("product_price_tiktok", numericTiktokPrice);
       formData.append("stock", stock);
       formData.append("minOrder", minOrder);
       formData.append("condition", condition);
@@ -218,6 +227,7 @@ const AddProduct = () => {
         setDescription("");
         setSku("");
         setPrice("");
+        setTiktokPrice("");
         setStock("");
         setMinOrder("");
         setCondition("Baru");
@@ -416,6 +426,23 @@ const AddProduct = () => {
                   value={price}
                   required
                 />
+              </div>
+              <div>
+                <label
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                  htmlFor="product-tiktok-price"
+                >
+                  Harga TikTok (Rp)
+                </label>
+                <input
+                  id="product-tiktok-price"
+                  type="text"
+                  placeholder="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                  onChange={handleTiktokPriceChange}
+                  value={tiktokPrice}
+                />
+                <p className="text-xs text-gray-500 mt-1">Kosongkan jika sama dengan harga website.</p>
               </div>
             </div>
 

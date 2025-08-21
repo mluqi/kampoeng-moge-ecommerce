@@ -219,7 +219,7 @@ const HomepageManagerPage = () => {
   return (
     <div className="p-6 bg-gray-50 min-h-full">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">
-        Manajer Halaman Utama
+        Pengaturan Beranda
       </h1>
 
       {/* Tabs */}
@@ -267,7 +267,7 @@ const HomepageManagerPage = () => {
                   <tr>
                     <th className="px-6 py-3">Gambar</th>
                     <th className="px-6 py-3">Status</th>
-                    <th className="px-6 py-3">Display Order</th>
+                    <th className="px-6 py-3">Urutan Tampil</th>
                     <th className="px-6 py-3 text-right">Aksi</th>
                   </tr>
                 </thead>
@@ -423,8 +423,7 @@ const HomepageManagerPage = () => {
 
       {/* Slide Modal */}
       {isSlideModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl m-4 relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[110] p-4">          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl m-4 relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={handleCloseModals}
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
@@ -477,7 +476,7 @@ const HomepageManagerPage = () => {
                     ...p,
                     desktop: URL.createObjectURL(e.target.files[0]),
                   })),
-                "Rekomendasi ukuran: 1424x328 pixel."
+                "Rekomendasi ukuran: 1667x331  pixel."
               )}
               {renderImageInput(
                 "image_mobile",
@@ -489,7 +488,7 @@ const HomepageManagerPage = () => {
                     ...p,
                     mobile: URL.createObjectURL(e.target.files[0]),
                   })),
-                "Rekomendasi ukuran: 362x504 pixel."
+                "Rekomendasi ukuran: 339x310 pixel."
               )}
               <div className="flex justify-end gap-3 pt-4">
                 <button
@@ -514,8 +513,7 @@ const HomepageManagerPage = () => {
 
       {/* Login Banner Modal */}
       {isLoginBannerModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl m-4 relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[110] p-4">          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl m-4 relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={handleCloseModals}
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
@@ -561,7 +559,7 @@ const HomepageManagerPage = () => {
                   setLoginBannerImagePreview(
                     URL.createObjectURL(e.target.files[0])
                   ),
-                "Rekomendasi ukuran: 400x600 pixel."
+                "Rekomendasi ukuran: 961x918 pixel."
               )}
               <div className="flex justify-end gap-3 pt-4">
                 <button

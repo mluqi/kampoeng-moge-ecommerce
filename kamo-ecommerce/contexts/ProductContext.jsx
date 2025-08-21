@@ -61,7 +61,6 @@ export const ProductProvider = ({ children }) => {
     setError("");
     try {
       const res = await api.get(`/products/${id}`);
-      console.log(res.data);
       return res.data;
     } catch (error) {
       setError(error?.response?.data?.message || "Gagal mengambil produk");

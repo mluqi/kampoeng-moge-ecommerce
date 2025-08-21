@@ -90,7 +90,7 @@ const ReviewsPage = () => {
     <div className="p-6 max-w-8xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">
-          Product Reviews Management
+          Kelola Ulasan Produk
         </h1>
         <button
           onClick={loadReviews}
@@ -98,7 +98,7 @@ const ReviewsPage = () => {
           disabled={loading}
         >
           <FiRefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
+          Muat Ulang
         </button>
       </div>
 
@@ -126,13 +126,13 @@ const ReviewsPage = () => {
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
-          <option value="all">All Status</option>
-          <option value="show">Visible</option>
-          <option value="hide">Hidden</option>
+          <option value="all">Semua Status</option>
+          <option value="show">Tampilkan</option>
+          <option value="hide">Sembunyikan</option>
         </select>
 
         <div className="flex items-center justify-end text-sm text-gray-500">
-          Showing {filteredReviews.length} of {reviews.length} reviews
+          Menampilkan {filteredReviews.length} dari {reviews.length} ulasan
         </div>
       </div>
 
@@ -154,7 +154,7 @@ const ReviewsPage = () => {
             }}
             className="mt-4 px-4 py-2 text-blue-600 hover:text-blue-800"
           >
-            Clear filters
+            Hilangkan filters
           </button>
         </div>
       ) : (
@@ -164,19 +164,19 @@ const ReviewsPage = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    User & Product
+                    Pelanggan & Produk
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Rating
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Comment
+                    Komentar
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
+                    Aksi
                   </th>
                 </tr>
               </thead>

@@ -4,7 +4,7 @@ const SORT_OPTIONS = [
   { value: "newest", label: "Terbaru" },
   { value: "highest-price", label: "Harga Tertinggi" },
   { value: "lowest-price", label: "Harga Terendah" },
-  { value: "most-sold", label: "Terjual Terbanyak" },
+  { value: "most-sold", label: "Produk Terjual" },
 ];
 
 export default function ProductFilterBar({
@@ -52,7 +52,7 @@ export default function ProductFilterBar({
                   : "bg-white text-accent border-gray-200 hover:bg-gray-50"
               }`}
           >
-            All Collections
+            Semua Kategori
           </button>
 
           {/* Show first 3 categories as buttons */}

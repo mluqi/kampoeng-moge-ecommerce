@@ -1,7 +1,8 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 
 const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -9,7 +10,7 @@ const SORT_OPTIONS = [
   { value: "newest", label: "Terbaru" },
   { value: "highest-price", label: "Harga Tertinggi" },
   { value: "lowest-price", label: "Harga Terendah" },
-  { value: "most-sold", label: "Terjual Terbanyak" },
+  { value: "most-sold", label: "Produk Terjual" },
 ];
 
 export default function ProductFilterBar({
@@ -20,11 +21,11 @@ export default function ProductFilterBar({
   onSortChange,
 }) {
   const router = useRouter();
-  const [xPos, setXPos] = useState(0);
   const animRef = useRef(null);
   const containerRef = useRef(null);
+  const [xPos, setXPos] = useState(0);
 
-  const allSlides = [
+  const allSlides = useMemo(() => [
     ...categories.map((cat) => ({
       id: cat.category_id,
       type: "category",
@@ -40,7 +41,7 @@ export default function ProductFilterBar({
       image:
         "https://images.unsplash.com/photo-1511556820780-d912e42b4980?auto=format&fit=crop&w=800&q=80",
     },
-  ];
+  ], [categories]);
 
   const infiniteSlides = [...allSlides, ...allSlides, ...allSlides];
   const slideWidth = 128 + 12;
@@ -72,10 +73,19 @@ export default function ProductFilterBar({
     }
   };
 
+  const handleArrowScroll = (direction) => {
+    stopScroll();
+    const scrollAmount = containerRef.current
+      ? containerRef.current.offsetWidth * 0.7
+      : 300;
+
+    setXPos((prev) => {
+      return Math.min(0, prev + (direction === "left" ? scrollAmount : -scrollAmount));
+    });
+  };
+
   const handleSlideClick = (slide) => {
-    if (slide.type === "all") {
-      onCategoryChange("");
-    } else if (slide.type === "category") {
+    if (slide.type === "category") {
       router.push(`/category/${slide.id}`);
     } else if (slide.type === "other") {
       router.push("/category");
@@ -83,53 +93,70 @@ export default function ProductFilterBar({
   };
 
   const isSelected = (slide) => {
-    if (slide.type === "all") return selectedCategory === "";
     if (slide.type === "category") return selectedCategory === slide.id;
-    if (slide.type === "other") return selectedCategory === "other";
     return false;
   };
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Category Boxes with Pause on Hover + Drag */}
-      <div
-        className="overflow-hidden mb-2 cursor-grab active:cursor-grabbing"
-        ref={containerRef}
-        onMouseEnter={stopScroll}
-        onMouseLeave={startScroll}
-      >
-        <motion.div
-          className="flex gap-3"
-          drag="x"
-          dragConstraints={{
-            left: -totalWidth,
-            right: 0,
-          }}
-          dragElastic={0.1}
-          style={{
-            x: xPos,
-            width: `${infiniteSlides.length * slideWidth}px`,
-          }}
+      {/* Category Slider */}
+      <div className="relative w-full">
+        <div
+          className="overflow-hidden mb-2 cursor-grab active:cursor-grabbing"
+          ref={containerRef}
+          onMouseEnter={stopScroll}
+          onMouseLeave={startScroll}
         >
-          {infiniteSlides.map((slide, index) => (
-            <motion.button
-              key={`${slide.id}-${index}`}
-              onClick={() => handleSlideClick(slide)}
-              className={`relative h-32 w-32 rounded-lg overflow-hidden transition-all cursor-pointer
+          <motion.div
+            className="flex gap-3"
+            drag="x"
+            dragConstraints={{
+              left: -totalWidth,
+              right: 0,
+            }}
+            dragElastic={0.1}
+            style={{
+              x: xPos,
+              width: `${infiniteSlides.length * slideWidth}px`,
+            }}
+            onDragStart={stopScroll}
+          >
+            {infiniteSlides.map((slide, index) => (
+              <motion.button
+                key={`${slide.id}-${index}`}
+                onClick={() => handleSlideClick(slide)}
+                className={`relative h-32 w-32 rounded-lg overflow-hidden transition-all cursor-pointer
                 flex items-end p-3 bg-cover bg-center flex-shrink-0
                 ${isSelected(slide) ? "ring-2 ring-accent ring-offset-2" : ""}`}
-              style={{
-                backgroundImage: `url('${slide.image}')`,
-              }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <span className="text-white font-medium text-sm drop-shadow-md">
-                {slide.label}
-              </span>
-            </motion.button>
-          ))}
-        </motion.div>
+                style={{
+                  backgroundImage: `url('${slide.image}')`,
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <span className="text-white font-medium text-sm drop-shadow-md">
+                  {slide.label}
+                </span>
+              </motion.button>
+            ))}
+          </motion.div>
+        </div>
+
+        {/* Navigation Arrows */}
+        <button
+          onClick={() => handleArrowScroll("left")}
+          className="absolute top-1/2 -translate-y-1/2 -left-4 z-10 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition"
+          aria-label="Scroll Left"
+        >
+          <FiChevronLeft className="w-5 h-5 text-gray-700" />
+        </button>
+        <button
+          onClick={() => handleArrowScroll("right")}
+          className="absolute top-1/2 -translate-y-1/2 -right-4 z-10 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition"
+          aria-label="Scroll Right"
+        >
+          <FiChevronRight className="w-5 h-5 text-gray-700" />
+        </button>
       </div>
 
       {/* Sort Dropdown */}

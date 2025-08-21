@@ -65,7 +65,6 @@ const Dashboard = () => {
 
   // Transform best selling products data for chart
   const getProductPerformanceData = () => {
-    console.log("stats", stats);
     if (!stats?.bestSellingProducts || stats.bestSellingProducts.length === 0) {
       return {
         labels: ["Tidak ada data"],

@@ -4,8 +4,9 @@ import { assets } from "@/assets/assets";
 import ProductCard from "@/components/ProductCard";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import Link from "next/link";
 import Image from "next/image";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, usePathname } from "next/navigation";
 import Loading from "@/components/Loading";
 import { useProduct } from "@/contexts/ProductContext";
 import { useUserAuth } from "@/contexts/UserAuthContext";
@@ -35,6 +36,7 @@ const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 const Product = () => {
   const { id } = useParams();
   const router = useRouter();
+  const pathname = usePathname();
   const { fetchProductById } = useProduct();
   const { addToCart } = useCart();
   const { user, wishlist, addToWishlist, removeFromWishlist } = useUserAuth();
@@ -108,7 +110,9 @@ const Product = () => {
           const res = await api.get(
             `/products?category=${productData.product_category}&limit=6`
           );
+          //tambahkan filter product yang stocknya lebih dari 0
           const filtered = res.data.data
+            .filter((p) => p.product_stock > 0)
             .filter((p) => p.product_id !== id)
             .slice(0, 5);
           setRelatedProducts(filtered);
@@ -148,7 +152,7 @@ const Product = () => {
 
   const handleWishlistClick = () => {
     if (!user) {
-      router.push("/account");
+      router.push(`/account?callbackUrl=${pathname}`);
       return;
     }
     if (isWishlisted) {
@@ -168,6 +172,7 @@ const Product = () => {
           color: "#fff",
         },
       });
+      router.push(`/account?callbackUrl=${pathname}`);
       return;
     }
     addToCart(productData.product_id);
@@ -183,6 +188,7 @@ const Product = () => {
           color: "#fff",
         },
       });
+      router.push(`/account?callbackUrl=${pathname}`);
       return;
     }
     addToCart(productData.product_id);
@@ -194,7 +200,12 @@ const Product = () => {
       toast.error("Silakan login untuk memulai chat.", {
         icon: "🔒",
         position: "top-center",
+        style: {
+          background: "#ff4444",
+          color: "#fff",
+        },
       });
+      router.push(`/account?callbackUrl=${pathname}`);
       return;
     }
 
@@ -208,6 +219,14 @@ const Product = () => {
         : assets.product_placeholder.src, // Pastikan placeholder punya .src
     };
     startChatWithProduct(productInfo);
+  };
+
+  const handleCategoryDirect = () => {
+    if (typeof productData.category === "object") {
+      return () => router.push(`/category/${productData.category.category_id}`);
+    } else {
+      return () => router.push(`/category/${productData.category}`);
+    }
   };
 
   if (!productData) {
@@ -368,17 +387,30 @@ const Product = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-8">
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="text-sm text-gray-500">Brand</p>
-                <p className="font-medium">
-                  {productData.product_brand || "-"}
-                </p>
-              </div>
+              {productData.product_brand ? (
+                <Link
+                  href={`/brand/${encodeURIComponent(
+                    productData.product_brand
+                  )}`}
+                  className="bg-gray-50 p-3 rounded-lg cursor-pointer hover:bg-gray-100 transition"
+                >
+                  <p className="text-sm text-gray-500">Brand</p>
+                  <p className="font-medium">{productData.product_brand}</p>
+                </Link>
+              ) : (
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-500">Brand</p>
+                  <p className="font-medium">Tidak tersedia</p>
+                </div>
+              )}
               <div className="bg-gray-50 p-3 rounded-lg">
                 <p className="text-sm text-gray-500">Kondisi</p>
                 <p className="font-medium">{productData.product_condition}</p>
               </div>
-              <div className="bg-gray-50 p-3 rounded-lg">
+              <div
+                className="bg-gray-50 p-3 rounded-lg cursor-pointer hover:bg-gray-100 transition"
+                onClick={handleCategoryDirect()}
+              >
                 <p className="text-sm text-gray-500">Kategori</p>
                 <p className="font-medium">
                   {typeof productData.category === "object"
@@ -424,6 +456,48 @@ const Product = () => {
             </div>
           </div>
         </div>
+
+        {/* Related Products */}
+        <section className="mt-16">
+          <div className="flex flex-col items-center mb-8">
+            <h2 className="text-2xl font-bold text-center">
+              Produk <span className="text-accent">Terkait</span>
+            </h2>
+            <div className="w-24 h-1 bg-accent rounded-full mt-2"></div>
+          </div>
+
+          {loadingRelated ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+              {[...Array(5)].map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-gray-100 rounded-lg aspect-[3/4] animate-pulse"
+                ></div>
+              ))}
+            </div>
+          ) : relatedProducts.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+              {relatedProducts.map((product) => (
+                <ProductCard key={product.product_id} product={product} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-500">
+                Tidak ada produk terkait yang ditemukan.
+              </p>
+            </div>
+          )}
+
+          <div className="flex justify-center mt-8">
+            <button
+              onClick={() => router.push("/all-products")}
+              className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
+            >
+              Lihat Semua Produk <FiChevronRight />
+            </button>
+          </div>
+        </section>
 
         {/* Reviews Section */}
         <section className="mt-16 pt-8 border-t">
@@ -483,48 +557,6 @@ const Product = () => {
               </p>
             </div>
           )}
-        </section>
-
-        {/* Related Products */}
-        <section className="mt-16">
-          <div className="flex flex-col items-center mb-8">
-            <h2 className="text-2xl font-bold text-center">
-              Produk <span className="text-accent">Terkait</span>
-            </h2>
-            <div className="w-24 h-1 bg-accent rounded-full mt-2"></div>
-          </div>
-
-          {loadingRelated ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-              {[...Array(5)].map((_, i) => (
-                <div
-                  key={i}
-                  className="bg-gray-100 rounded-lg aspect-[3/4] animate-pulse"
-                ></div>
-              ))}
-            </div>
-          ) : relatedProducts.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-              {relatedProducts.map((product) => (
-                <ProductCard key={product.product_id} product={product} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-gray-500">
-                Tidak ada produk terkait yang ditemukan.
-              </p>
-            </div>
-          )}
-
-          <div className="flex justify-center mt-8">
-            <button
-              onClick={() => router.push("/all-products")}
-              className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
-            >
-              Lihat Semua Produk <FiChevronRight />
-            </button>
-          </div>
         </section>
       </div>
       <Footer />

@@ -14,8 +14,8 @@ const poppinsFont = Poppins({
 
 export const metadata: Metadata = {
   title: {
-    default: "KAMO Ecommerce - Jual Sparepart Moge Terpercaya", // Judul default
-    template: "%s | KAMO Ecommerce", // Template untuk judul di halaman lain
+    default: "KAMO Ecommerce - Jual Sparepart Moge Terpercaya",
+    template: "%s | KAMO Ecommerce",
   },
   description:
     "Temukan berbagai sparepart motor gede (moge) berkualitas, suku cadang, dan aksesoris di KAMO Ecommerce. Belanja aman, pengiriman cepat.",
@@ -29,14 +29,15 @@ export const metadata: Metadata = {
   openGraph: {
     title: "KAMO Ecommerce - Jual Sparepart Moge Terpercaya",
     description:
-      "Temukan berbagai sparepart motor gede (moge) berkualitas dan aksesorisnya.",
-    url: "https://www.kamoecommerce.com", // Ganti dengan URL produksi Anda
-    siteName: "KAMO Ecommerce",
+      "Temukan berbagai sparepart motor gede (moge) berkualitas dan aksesorisnya di kampoengmoge.com",
+    url: "https://kampoengmoge.com",
+    siteName: "kampoengmoge.com",
     images: [
       {
-        url: "assets/logo_accent.png", // URL gambar default untuk social media
+        url: "https://kampoengmoge.com/uploads/settings/1754966221417-logo_accent.svg", // Pastikan URL gambar absolut dan benar
         width: 1200,
         height: 630,
+        alt: "KAMO Ecommerce Logo",
       },
     ],
     locale: "id_ID",
@@ -46,8 +47,10 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "KAMO Ecommerce - Jual Sparepart Moge Terpercaya",
     description:
-      "Temukan berbagai motor gede (moge) berkualitas dan aksesorisnya.",
-    images: "assets/logo_accent.png", // URL gambar untuk Twitter
+      "Temukan berbagai sparepart motor gede (moge) berkualitas dan aksesorisnya di kampoengmoge.com",
+    images:
+      "https://kampoengmoge.com/uploads/settings/1754966221417-logo_accent.svg",
+    site: "@kampoengmoge", // Tambahkan handle Twitter jika ada
   },
   robots: {
     index: true,
@@ -59,6 +62,9 @@ export const metadata: Metadata = {
       "max-image-preview": "large",
       "max-snippet": -1,
     },
+  },
+  alternates: {
+    canonical: "https://kampoengmoge.com",
   },
 };
 

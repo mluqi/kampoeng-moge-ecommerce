@@ -89,13 +89,16 @@ export const ChatProvider = ({ children }) => {
   }, [fetchConversation]);
 
   // Mengirim pesan
-  const sendMessage = async (content) => {
+  const sendMessage = async (messageData) => {
     if (!conversation) return;
+
+    const payload =
+      typeof messageData === "string" ? { content: messageData } : messageData;
 
     try {
       const res = await api.post("/chat/messages", {
+        ...payload,
         conversationId: conversation.id,
-        content,
       });
       setMessages((prev) => [...prev, res.data]);
     } catch (error) {
@@ -132,26 +135,12 @@ export const ChatProvider = ({ children }) => {
 
   const startChatWithProduct = (productInfo) => {
     openChat();
-
-    // Buat pesan khusus untuk menampilkan kartu produk di UI
-    // Ini adalah pesan client-side, tidak dikirim ke backend
-    const productMessage = {
-      id: `product-inquiry-${productInfo.id}`, // ID unik untuk rendering
-      type: "product_inquiry",
-      product: productInfo,
-      createdAt: new Date().toISOString(),
-    };
-
-    // Tambahkan kartu produk ke daftar pesan jika belum ada
-    setMessages((prev) => {
-      if (prev.some((msg) => msg.id === productMessage.id)) {
-        return prev;
-      }
-      return [...prev, productMessage];
+    // Kirim pesan ke backend dengan menyertakan productId
+    sendMessage({
+      content: `Halo, saya ingin bertanya tentang produk: ${productInfo.name}`,
+      product_id: productInfo.id,
+      type: "product_inquiry", // type ini bisa opsional jika backend hanya cek `productId`
     });
-
-    // Kirim pesan otomatis ke admin
-    sendMessage(`Halo, saya ingin bertanya tentang produk: ${productInfo.name}`);
   };
 
   const value = {

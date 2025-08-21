@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }) => {
     try {
       await api.post("/auth/admin/logout");
     } catch (e) {
-      console.log(e);
+      // console.log(e);
     }
     localStorage.removeItem("token");
     setAdmin(null); // Clear admin state on logout

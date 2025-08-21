@@ -29,7 +29,11 @@ const Footer = () => {
         <div className="w-4/5">
           <Image
             className="w-28 md:w-32"
-            src={settings?.footer?.logo_url ? `${baseUrl}${settings.footer.logo_url}` : assets.logo}
+            src={
+              settings?.footer?.logo_url
+                ? `${baseUrl}${settings.footer.logo_url}`
+                : assets.logo
+            }
             alt="logo"
             width={128}
             height={40}
@@ -45,7 +49,7 @@ const Footer = () => {
             <ul className="text-sm space-y-2">
               <li>
                 <a className="hover:underline transition" href="/">
-                  Home
+                  Beranda
                 </a>
               </li>
               <li>
@@ -132,8 +136,17 @@ const Footer = () => {
           </div>
         </div>
       </div>
-      <p className="py-4 text-center text-xs md:text-sm bg-accent/90 text-white">
-        Copyright © {new Date().getFullYear()} PalindoDev All Right Reserved.
+      <p className="py-4 text-center text-xs md:text-sm bg-accent/90 text-white/90">
+        Copyright © {new Date().getFullYear()}{" "}
+        <a
+          href="https://palindo.id"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-semibold text-white hover:underline"
+        >
+          palindo.id
+        </a>{" "}
+        All Right Reserved.
       </p>
     </footer>
   );

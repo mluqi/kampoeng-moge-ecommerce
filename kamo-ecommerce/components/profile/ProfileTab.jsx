@@ -7,7 +7,7 @@ import { toast } from "react-hot-toast";
 import Image from "next/image";
 
 const ProfileTab = () => {
-  const { user, profile, fetchProfile } = useUserAuth();
+  const { user, profile, userProfile } = useUserAuth();
   const [formData, setFormData] = useState({
     user_name: "",
     user_phone: "",
@@ -40,10 +40,12 @@ const ProfileTab = () => {
     try {
       await api.put("/auth/profile", payload);
       toast.success("Profil berhasil diperbarui!");
-      await fetchProfile();
+      await userProfile();
       setIsEditing(false);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Gagal memperbarui profil.");
+      toast.error(
+        error.response?.data?.message || "Gagal memperbarui profil."
+      );
     } finally {
       setLoading(false);
     }

@@ -3,7 +3,8 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/contexts/CartContext";
-import { FaHome, FaStore, FaThLarge, FaShoppingCart } from "react-icons/fa";
+import { FaHome, FaStore, FaThList, FaShoppingCart } from "react-icons/fa";
+import { CategoryIcon } from "@/assets/assets";
 
 const MobileBottomNav = () => {
   const pathname = usePathname();
@@ -12,7 +13,7 @@ const MobileBottomNav = () => {
   const navItems = [
     { href: "/", label: "Home", icon: <FaHome size={20} /> },
     { href: "/all-products", label: "Produk", icon: <FaStore size={20} /> },
-    { href: "/category", label: "Kategori", icon: <FaThLarge size={20} /> },
+    { href: "/category", label: "Kategori", icon: <CategoryIcon /> },
     {
       href: "/cart",
       label: "Keranjang",
@@ -21,8 +22,8 @@ const MobileBottomNav = () => {
     },
   ];
 
-  // Jangan tampilkan navigasi di halaman admin
-  if (pathname.startsWith("/admin")) {
+  // Jangan tampilkan navigasi di halaman admin atau login
+  if (pathname.startsWith("/admin") || pathname.startsWith("/account")) {
     return null;
   }
 

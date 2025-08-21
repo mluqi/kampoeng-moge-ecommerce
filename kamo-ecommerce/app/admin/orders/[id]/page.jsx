@@ -89,7 +89,7 @@ const OrderDetailContent = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-8xl mx-auto">
         <button
           onClick={() => router.back()}
           className="mb-4 text-accent hover:underline"
@@ -163,7 +163,7 @@ const OrderDetailContent = () => {
         </div>
 
         {/* Order Status Tracker */}
-        <div className="my-8"><OrderStatusTracker status={order.status} /></div>
+        <div className="my-8"><OrderStatusTracker status={order.status} shippingNumber={order.shipping_number} /></div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-8">

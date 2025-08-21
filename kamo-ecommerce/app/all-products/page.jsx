@@ -7,18 +7,23 @@ import Loading from "@/components/Loading";
 import { useProduct } from "@/contexts/ProductContext";
 import { useCategory } from "@/contexts/CategoryContext";
 import ProductFilterBarOld from "@/components/ProductFilterBarOld";
+import { useSearchParams } from "next/navigation";
 
 const PRODUCTS_PER_PAGE = 20;
 
 const AllProducts = () => {
   const { products, loading, fetchPublicProducts } = useProduct();
   const { categories, fetchCategories } = useCategory();
+  const searchParams = useSearchParams();
+
+  // Mengambil search term dari URL parameter
+  const urlSearchTerm = searchParams.get("search") || "";
 
   // Mengubah state awal agar konsisten dengan value di filter bar
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(urlSearchTerm);
   const [currentPage, setCurrentPage] = useState(1);
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(urlSearchTerm);
   const [selectedSort, setSelectedSort] = useState("newest");
 
   // Debounce search input dan reset halaman ke-1 saat filter berubah
@@ -31,6 +36,14 @@ const AllProducts = () => {
       clearTimeout(handler);
     };
   }, [searchTerm]);
+
+  // Set initial search term from URL when component mounts
+  useEffect(() => {
+    if (urlSearchTerm) {
+      setSearchTerm(urlSearchTerm);
+      setDebouncedSearchTerm(urlSearchTerm);
+    }
+  }, [urlSearchTerm]);
 
   // Reset ke halaman 1 setiap kali ada filter yang berubah
   useEffect(() => {

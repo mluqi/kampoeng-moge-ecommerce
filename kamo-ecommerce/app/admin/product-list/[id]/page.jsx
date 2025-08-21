@@ -40,6 +40,7 @@ const ProductDetailEdit = () => {
     description: "",
     sku: "",
     price: "",
+    product_price_tiktok: "",
     stock: "",
     condition: "Baru",
     status: "active",
@@ -79,6 +80,14 @@ const ProductDetailEdit = () => {
     setForm((prev) => ({
       ...prev,
       price: formatNumber(raw),
+    }));
+  };
+
+  const handleTiktokPriceChange = (e) => {
+    const raw = e.target.value.replace(/\D/g, "");
+    setForm((prev) => ({
+      ...prev,
+      product_price_tiktok: formatNumber(raw),
     }));
   };
 
@@ -144,6 +153,7 @@ const ProductDetailEdit = () => {
           description: fetched.product_description || "",
           sku: fetched.product_sku || "",
           price: formatNumber(fetched.product_price),
+          product_price_tiktok: formatNumber(fetched.product_price_tiktok || ""),
           stock: fetched.product_stock || "",
           condition: fetched.product_condition || "Baru",
           status: fetched.product_status || "active",
@@ -282,6 +292,10 @@ const ProductDetailEdit = () => {
     formData.append("sku", form.sku);
     // Kirim harga ke backend sebagai angka tanpa titik
     formData.append("price", form.price.replace(/\./g, ""));
+    formData.append(
+      "product_price_tiktok",
+      form.product_price_tiktok.replace(/\./g, "")
+    );
     formData.append("stock", form.stock);
     formData.append("condition", form.condition);
     formData.append("status", form.status);
@@ -305,7 +319,7 @@ const ProductDetailEdit = () => {
 
     existingPictures.forEach((pic, idx) => {
       if (!markedForRemoval.includes(idx)) {
-        console.log("existingPictures[]", pic);
+        // console.log("existingPictures[]", pic);
         formData.append("existingPictures[]", pic);
       }
     });
@@ -378,7 +392,7 @@ const ProductDetailEdit = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="max-w-8xl mx-auto bg-white rounded-xl shadow-sm overflow-hidden">
         {!editMode ? (
           <>
             <div className="p-6 border-b">
@@ -463,6 +477,13 @@ const ProductDetailEdit = () => {
                         <p className="font-medium">
                           Rp{" "}
                           {(product.product_price || 0).toLocaleString("id-ID")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Harga TikTok</p>
+                        <p className="font-medium">
+                          Rp{" "}
+                          {(product.product_price_tiktok || 0).toLocaleString("id-ID")}
                         </p>
                       </div>
                       <div>
@@ -817,6 +838,25 @@ const ProductDetailEdit = () => {
                           required
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Harga TikTok (Rp)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5">Rp</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
+                          value={form.product_price_tiktok}
+                          onChange={handleTiktokPriceChange}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Kosongkan jika sama dengan harga website.
+                      </p>
                     </div>
 
                     <div>
