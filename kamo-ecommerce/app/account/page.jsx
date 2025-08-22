@@ -5,7 +5,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import Image from "next/image";
 import { assets } from "@/assets/assets";
 import { FcGoogle } from "react-icons/fc";
-import { signIn } from "next-auth/react"; 
+import { signIn } from "next-auth/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserAuth } from "@/contexts/UserAuthContext";
 import api from "@/service/api";
@@ -41,7 +41,10 @@ const Account = () => {
         }
         // console.log(response.data)
       } catch (error) {
-        console.error("Failed to fetch login banners, using static images.", error);
+        console.error(
+          "Failed to fetch login banners, using static images.",
+          error
+        );
       }
     };
     fetchLoginBanners();
@@ -85,7 +88,7 @@ const Account = () => {
   const handleGoogleSignIn = async () => {
     await signIn("google", { callbackUrl: callbackUrl || "/" }); // Memulai alur autentikasi Google OAuth
   };
-  
+
   if (adminLoading || userLoading) {
     return <Loading />; // Show loading screen while checking auth status
   }
@@ -93,7 +96,7 @@ const Account = () => {
   return (
     <div className="min-h-screen w-full flex bg-white relative">
       {/* Left Column: Image Slider */}
-      <div className="hidden md:block w-1/2 relative">
+      <div className="hidden md:block w-1/2 relative aspect-[16/9]">
         {sliderImages.map((imageSrc, index) => (
           <Image
             key={index}

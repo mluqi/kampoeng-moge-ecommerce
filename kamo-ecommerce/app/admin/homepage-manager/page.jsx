@@ -17,12 +17,21 @@ const HomepageManagerPage = () => {
   const [isSlideModalOpen, setIsSlideModalOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(null);
   const [slideImagePreviews, setSlideImagePreviews] = useState({});
+  const [previewImage, setPreviewImage] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   //state for loginBanner
   const [loginBanners, setLoginBanners] = useState([]);
   const [isLoginBannerModalOpen, setIsLoginBannerModalOpen] = useState(false);
   const [currentLoginBanner, setCurrentLoginBanner] = useState(null);
   const [loginBannerImagePreview, setLoginBannerImagePreview] = useState(null);
+
+  // State untuk preview aspect ratio
+  const [aspectRatioPreviews, setAspectRatioPreviews] = useState({
+    desktop: null,
+    mobile: null,
+    loginBanner: null,
+  });
 
   // Generic State
   const [loading, setLoading] = useState(true);
@@ -56,6 +65,17 @@ const HomepageManagerPage = () => {
     loadData();
   }, [fetchSlides, fetchLoginBanners]);
 
+  // Modal preview handlers
+  const openModalPreview = (imageUrl) => {
+    setPreviewImage(imageUrl);
+    setIsModalOpen(true);
+  };
+
+  const closeModalPreview = () => {
+    setPreviewImage(null);
+    setIsModalOpen(false);
+  };
+
   // --- Modal Handlers ---
   const handleOpenSlideModal = (slide = null) => {
     setCurrentSlide(slide);
@@ -81,6 +101,65 @@ const HomepageManagerPage = () => {
     setCurrentLoginBanner(null);
     setSlideImagePreviews({});
     setLoginBannerImagePreview(null);
+    // Reset aspect ratio previews
+    setAspectRatioPreviews({
+      desktop: null,
+      mobile: null,
+      loginBanner: null,
+    });
+  };
+
+  const createAspectRatioPreview = (file, aspectRatio, callback) => {
+    if (!file) {
+      callback(null);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      callback(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Update fungsi handle image change untuk slide modal
+  const handleSlideImageChange = (e, type) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Preview gambar biasa
+    const previewUrl = URL.createObjectURL(file);
+    setSlideImagePreviews((prev) => ({
+      ...prev,
+      [type]: previewUrl,
+    }));
+
+    // Preview dengan aspect ratio
+    const aspectRatio = type === "desktop" ? "32/6" : "3/4";
+    createAspectRatioPreview(file, aspectRatio, (preview) => {
+      setAspectRatioPreviews((prev) => ({
+        ...prev,
+        [type]: preview,
+      }));
+    });
+  };
+
+  // Update fungsi handle image change untuk login banner
+  const handleLoginBannerImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Preview gambar biasa
+    const previewUrl = URL.createObjectURL(file);
+    setLoginBannerImagePreview(previewUrl);
+
+    // Preview dengan aspect ratio (840x970 ≈ 0.866)
+    createAspectRatioPreview(file, "840/970", (preview) => {
+      setAspectRatioPreviews((prev) => ({
+        ...prev,
+        loginBanner: preview,
+      }));
+    });
   };
 
   // --- Form Submit Handlers ---
@@ -183,7 +262,15 @@ const HomepageManagerPage = () => {
     </div>
   );
 
-  const renderImageInput = (name, label, preview, onChange, description) => (
+  const renderImageInput = (
+    name,
+    label,
+    preview,
+    onChange,
+    description,
+    aspectRatio,
+    aspectPreview
+  ) => (
     <div>
       <label
         htmlFor={name}
@@ -194,27 +281,65 @@ const HomepageManagerPage = () => {
       {description && (
         <p className="text-xs text-gray-500 mb-2">{description}</p>
       )}
-      <div className="flex items-center gap-4">
-        {preview && (
-          <Image
-            src={preview}
-            alt="Preview"
-            width={100}
-            height={60}
-            className="rounded-md object-cover"
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-4">
+          {preview && (
+            <Image
+              src={preview}
+              alt="Preview"
+              width={100}
+              height={60}
+              className="rounded-md object-cover"
+            />
+          )}
+          <input
+            type="file"
+            name={name}
+            id={name}
+            accept="image/*"
+            onChange={onChange}
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20"
+          />
+        </div>
+
+        {/* Tambahkan preview aspect ratio */}
+        {aspectPreview && (
+          <AspectRatioPreview
+            imageUrl={aspectPreview}
+            aspectRatio={aspectRatio}
+            title="Preview Tampilan Aktual"
           />
         )}
-        <input
-          type="file"
-          name={name}
-          id={name}
-          accept="image/*"
-          onChange={onChange}
-          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20"
-        />
       </div>
     </div>
   );
+
+  const AspectRatioPreview = ({ imageUrl, aspectRatio, title }) => {
+    if (!imageUrl) return null;
+
+    return (
+      <div className="mt-2 p-3 bg-gray-100 rounded-lg">
+        <p className="text-sm font-medium text-gray-700 mb-2">{title}</p>
+        <div
+          className="mx-auto bg-gray-200 overflow-hidden relative"
+          style={{
+            width: "100%",
+            maxWidth: "300px",
+            aspectRatio: aspectRatio,
+            backgroundImage: `url(${imageUrl})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+          }}
+        >
+          <div className="absolute inset-0 border border-dashed border-gray-400"></div>
+        </div>
+        <p className="text-xs text-gray-500 mt-2 text-center">
+          Preview area tampilan (ratio: {aspectRatio})
+        </p>
+      </div>
+    );
+  };
 
   return (
     <div className="p-6 bg-gray-50 min-h-full">
@@ -283,7 +408,10 @@ const HomepageManagerPage = () => {
                           alt={`Banner-${loginBanner.display_order}`}
                           width={120}
                           height={60}
-                          className="rounded-md object-cover"
+                          className="rounded-md object-cover cursor-pointer"
+                          onClick={() =>
+                            openModalPreview(baseUrl + loginBanner.images)
+                          }
                         />
                       </td>
                       <td className="px-6 py-4">
@@ -363,7 +491,10 @@ const HomepageManagerPage = () => {
                           alt="Desktop"
                           width={120}
                           height={60}
-                          className="rounded-md object-contain bg-gray-100"
+                          className="rounded-md object-contain bg-gray-100 cursor-pointer"
+                          onClick={() =>
+                            openModalPreview(baseUrl + slide.image_url_desktop)
+                          }
                         />
                       </td>
                       <td className="px-6 py-4">
@@ -372,7 +503,10 @@ const HomepageManagerPage = () => {
                           alt="Mobile"
                           width={60}
                           height={60}
-                          className="rounded-md object-contain bg-gray-100"
+                          className="rounded-md object-contain bg-gray-100 cursor-pointer"
+                          onClick={() =>
+                            openModalPreview(baseUrl + slide.image_url_mobile)
+                          }
                         />
                       </td>
                       <td className="px-6 py-4 font-medium text-gray-900">
@@ -421,9 +555,38 @@ const HomepageManagerPage = () => {
         )}
       </div>
 
+      {/* Image Preview Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[120] p-4">
+          <div className="bg-transparent rounded-lg max-w-7xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="relative">
+              <button
+                onClick={closeModalPreview}
+                className="absolute top-2 right-2 p-1 rounded-full bg-gray-100 hover:bg-gray-200 cursor-pointer text-gray-500"
+              >
+                <FaTimes size={20} />
+              </button>
+              {previewImage && (
+                <div className="p-4">
+                  <Image
+                    src={previewImage}
+                    alt="Preview"
+                    width={1000}
+                    height={600}
+                    className="rounded-md object-contain w-full max-h-[70vh]"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Slide Modal */}
       {isSlideModalOpen && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[110] p-4">          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl m-4 relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
+          {" "}
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl m-4 relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={handleCloseModals}
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
@@ -470,25 +633,19 @@ const HomepageManagerPage = () => {
                 "image_desktop",
                 "Gambar Desktop",
                 slideImagePreviews.desktop,
-                (e) =>
-                  e.target.files[0] &&
-                  setSlideImagePreviews((p) => ({
-                    ...p,
-                    desktop: URL.createObjectURL(e.target.files[0]),
-                  })),
-                "Rekomendasi ukuran: 1667x331  pixel."
+                (e) => handleSlideImageChange(e, "desktop"),
+                "Rekomendasi ratio ukuran 32:6",
+                "32/6",
+                aspectRatioPreviews.desktop
               )}
               {renderImageInput(
                 "image_mobile",
                 "Gambar Mobile",
                 slideImagePreviews.mobile,
-                (e) =>
-                  e.target.files[0] &&
-                  setSlideImagePreviews((p) => ({
-                    ...p,
-                    mobile: URL.createObjectURL(e.target.files[0]),
-                  })),
-                "Rekomendasi ukuran: 339x310 pixel."
+                (e) => handleSlideImageChange(e, "mobile"),
+                "Rekomendasi ratio ukuran 3:4",
+                "3/4",
+                aspectRatioPreviews.mobile
               )}
               <div className="flex justify-end gap-3 pt-4">
                 <button
@@ -513,7 +670,9 @@ const HomepageManagerPage = () => {
 
       {/* Login Banner Modal */}
       {isLoginBannerModalOpen && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[110] p-4">          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl m-4 relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
+          {" "}
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl m-4 relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={handleCloseModals}
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
@@ -554,12 +713,10 @@ const HomepageManagerPage = () => {
                 "image",
                 "Gambar Login Banner",
                 loginBannerImagePreview,
-                (e) =>
-                  e.target.files[0] &&
-                  setLoginBannerImagePreview(
-                    URL.createObjectURL(e.target.files[0])
-                  ),
-                "Rekomendasi ukuran: 961x918 pixel."
+                handleLoginBannerImageChange,
+                "Rekomendasi ukuran: 840x970 pixel.",
+                "840/970",
+                aspectRatioPreviews.loginBanner
               )}
               <div className="flex justify-end gap-3 pt-4">
                 <button

@@ -46,12 +46,12 @@ const HeaderSlider = () => {
 
   if (loading) {
     return (
-      <div className="bg-gray-200 animate-pulse py-8 md:px-14 px-5 mt-6 rounded-xl min-w-full h-[350px] md:h-[300px]"></div>
+      <div className="bg-gray-200 animate-pulse mt-6 rounded-xl w-full aspect-[32/9] md:aspect-[32/9]"></div>
     );
   }
 
   if (slides.length === 0) {
-    return null; // Jangan tampilkan apa-apa jika tidak ada slide
+    return null;
   }
 
   return (
@@ -66,24 +66,31 @@ const HeaderSlider = () => {
           <div key={slide.id} className="min-w-full mt-6 flex-shrink-0">
             <Link
               href={slide.link || "/"}
-              className="block relative py-8 md:px-14 px-5 mt-6 rounded-xl min-w-full h-[350px] md:h-[328px] overflow-hidden"
+              className="block relative mt-6 rounded-xl min-w-full overflow-hidden group"
             >
-              {/* Gambar untuk Desktop */}
-              <Image
-                className="hidden md:block object-cover"
-                src={baseUrl + slide.image_url_desktop}
-                alt={`Slide Desktop ${index + 1}`}
-                layout="fill"
-                priority={index === 0}
-              />
-              {/* Gambar untuk Mobile */}
-              <Image
-                className="block md:hidden object-cover"
-                src={baseUrl + slide.image_url_mobile}
-                alt={`Slide Mobile ${index + 1}`}
-                fill
-                priority={index === 0}
-              />
+              {/* Container untuk Desktop (32:6) */}
+              <div className="hidden md:block relative w-full aspect-[32/6]">
+                <Image
+                  src={baseUrl + slide.image_url_desktop}
+                  alt={`Slide Desktop ${index + 1}`}
+                  fill
+                  priority={index === 0}
+                  className="object-cover transition-transform duration-300"
+                  sizes="(max-width: 768px) 100vw, 1424px"
+                />
+              </div>
+              
+              {/* Container untuk Mobile (3:4) */}
+              <div className="block md:hidden relative w-full aspect-[3/4]">
+                <Image
+                  src={baseUrl + slide.image_url_mobile}
+                  alt={`Slide Mobile ${index + 1}`}
+                  fill
+                  priority={index === 0}
+                  className="object-cover transition-transform duration-300"
+                  sizes="(min-width: 769px) 100vw, 315px"
+                />
+              </div>
             </Link>
           </div>
         ))}
@@ -94,8 +101,8 @@ const HeaderSlider = () => {
           <div
             key={index}
             onClick={() => handleSlideChange(index)}
-            className={`h-2 w-2 rounded-full cursor-pointer ${
-              currentSlide === index ? "bg-accent" : "bg-gray-500/30"
+            className={`h-2 w-2 mb-2 rounded-full cursor-pointer transition-all duration-300 ${
+              currentSlide === index ? "bg-accent scale-125" : "bg-gray-500/30 hover:bg-gray-500/50"
             }`}
           ></div>
         ))}

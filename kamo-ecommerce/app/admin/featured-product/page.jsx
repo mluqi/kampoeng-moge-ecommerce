@@ -16,6 +16,9 @@ const FeaturedProductsAdminPage = () => {
   const [currentProduct, setCurrentProduct] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
+  const [aspectRatioPreview, setAspectRatioPreview] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
   const fetchProducts = async () => {
     try {
@@ -42,6 +45,7 @@ const FeaturedProductsAdminPage = () => {
     setIsModalOpen(false);
     setCurrentProduct(null);
     setImagePreview(null);
+    setAspectRatioPreview(null);
   };
 
   const handleDelete = async (id) => {
@@ -82,6 +86,73 @@ const FeaturedProductsAdminPage = () => {
     promise.finally(() => setIsSubmitting(false));
   };
 
+  // Modal preview handlers
+  const openPreviewModal = (imageUrl) => {
+    setPreviewImage(imageUrl);
+    setIsPreviewModalOpen(true);
+  };
+
+  const closePreviewModal = () => {
+    setPreviewImage(null);
+    setIsPreviewModalOpen(false);
+  };
+
+  // Fungsi untuk membuat preview dengan aspect ratio
+  const createAspectRatioPreview = (file, aspectRatio, callback) => {
+    if (!file) {
+      callback(null);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      callback(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Update fungsi handle image change
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Preview gambar biasa
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
+
+    // Preview dengan aspect ratio (1:1 untuk produk unggulan)
+    createAspectRatioPreview(file, "1/1", (preview) => {
+      setAspectRatioPreview(preview);
+    });
+  };
+
+  const AspectRatioPreview = ({ imageUrl, aspectRatio, title }) => {
+    if (!imageUrl) return null;
+
+    return (
+      <div className="mt-2 p-3 bg-gray-100 rounded-lg">
+        <p className="text-sm font-medium text-gray-700 mb-2">{title}</p>
+        <div
+          className="mx-auto bg-gray-200 overflow-hidden relative"
+          style={{
+            width: "100%",
+            maxWidth: "100px",
+            aspectRatio: aspectRatio,
+            backgroundImage: `url(${imageUrl})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+          }}
+        >
+          <div className="absolute inset-0 border border-dashed border-gray-400"></div>
+        </div>
+        <p className="text-xs text-gray-500 mt-2 text-center">
+          Preview area tampilan (ratio: {aspectRatio})
+        </p>
+      </div>
+    );
+  };
+
   if (loading) return <Loading />;
 
   return (
@@ -119,7 +190,10 @@ const FeaturedProductsAdminPage = () => {
                     alt={product.title}
                     width={80}
                     height={60}
-                    className="rounded-md object-cover"
+                    className="rounded-md object-cover cursor-pointer"
+                    onClick={() =>
+                      openPreviewModal(baseUrl + product.image_url)
+                    }
                   />
                 </td>
                 <td className="px-6 py-4 font-medium text-gray-900">
@@ -160,7 +234,9 @@ const FeaturedProductsAdminPage = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[110] p-4">          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl m-4 relative">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
+          {" "}
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl m-4 relative">
             <button
               onClick={handleCloseModal}
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
@@ -275,33 +351,44 @@ const FeaturedProductsAdminPage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Gambar
                 </label>
-                <div className="flex items-center gap-4">
-                  {imagePreview && (
-                    <Image
-                      src={imagePreview}
-                      alt="Preview"
-                      width={100}
-                      height={75}
-                      className="rounded-md object-cover"
+                <p className="text-xs text-gray-500 mb-2">Rekomendasi ukuran ratio 3:4</p>
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-4">
+                    {imagePreview && (
+                      <Image
+                        src={imagePreview}
+                        alt="Preview"
+                        width={100}
+                        height={75}
+                        className="rounded-md object-cover cursor-pointer"
+                        onClick={() => openPreviewModal(imagePreview)}
+                      />
+                    )}
+                    <input
+                      type="file"
+                      name="image"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20"
+                    />
+                  </div>
+
+                  {/* Tambahkan preview aspect ratio */}
+                  {aspectRatioPreview && (
+                    <AspectRatioPreview
+                      imageUrl={aspectRatioPreview}
+                      aspectRatio="3/4"
+                      title="Preview Tampilan Aktual (Akan Dikrop ke Ratio 3:4)"
                     />
                   )}
-                  <input
-                    type="file"
-                    name="image"
-                    accept="image/*"
-                    onChange={(e) => {
-                      if (e.target.files[0]) {
-                        setImagePreview(URL.createObjectURL(e.target.files[0]));
-                      }
-                    }}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20"
-                  />
+
+                  {!currentProduct && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Gambar wajib diisi untuk item baru. Gambar akan dikrop ke
+                      ratio 1:1.
+                    </p>
+                  )}
                 </div>
-                {!currentProduct && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Gambar wajib diisi untuk item baru.
-                  </p>
-                )}
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button
@@ -320,6 +407,33 @@ const FeaturedProductsAdminPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {isPreviewModalOpen && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[120] p-4">
+          <div className="bg-transparent rounded-lg max-w-7xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="relative">
+              <button
+                onClick={closePreviewModal}
+                className="absolute top-2 right-2 p-1 rounded-full bg-gray-100 hover:bg-gray-200 z-10 cursor-pointer"
+              >
+                <FaTimes size={20} />
+              </button>
+              {previewImage && (
+                <div className="p-4">
+                  <Image
+                    src={previewImage}
+                    alt="Preview"
+                    width={1000}
+                    height={1000}
+                    className="rounded-md object-contain w-full max-h-[70vh]"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
