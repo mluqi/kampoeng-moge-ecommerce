@@ -6,6 +6,7 @@ import Loading from "@/components/Loading";
 import { useRouter } from "next/navigation";
 import { useProduct } from "@/contexts/ProductContext";
 import { useCategory } from "@/contexts/CategoryContext";
+import { FaEye } from "react-icons/fa";
 import toast from "react-hot-toast";
 import ProductTiktokActions from "@/components/admin/ProductTiktokActions";
 import api from "@/service/api";
@@ -17,8 +18,10 @@ const ProductList = () => {
   const router = useRouter();
   const { products, loading, error, fetchProducts, updateProductStatus } =
     useProduct();
+  const [editingCell, setEditingCell] = useState({ rowId: null, field: null });
+  const [editValue, setEditValue] = useState("");
   const [tiktokStatuses, setTiktokStatuses] = useState({});
-
+  
   const { categories, fetchCategories } = useCategory();
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -56,6 +59,114 @@ const ProductList = () => {
     selectedCategory,
     statusFilter,
   ]);
+
+  const formatNumber = (value) => {
+    if (!value && value !== 0) return "";
+    return String(value)
+      .replace(/\D/g, "")
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  const unformatNumber = (value) => {
+    return String(value).replace(/\./g, "");
+  };
+
+  const handleDoubleClick = (product, field) => {
+    setEditingCell({ rowId: product.product_id, field });
+    let initialValue =
+      product[
+        field === "price"
+          ? "product_price"
+          : field === "product_price_tiktok"
+          ? "product_price_tiktok"
+          : "product_stock"
+      ];
+    setEditValue(
+      field.includes("price") ? formatNumber(initialValue) : initialValue
+    );
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCell({ rowId: null, field: null });
+    setEditValue("");
+  };
+
+  const handleEditChange = (e) => {
+    const { value } = e.target;
+    if (editingCell.field.includes("price")) {
+      setEditValue(formatNumber(value));
+    } else {
+      setEditValue(value);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!editingCell.rowId) return;
+
+    const { rowId, field } = editingCell;
+
+    // Map the state's `field` to the actual property name in the product object.
+    const productPropertyName =
+      field === "price"
+        ? "product_price"
+        : field === "product_price_tiktok"
+        ? "product_price_tiktok"
+        : "product_stock";
+
+    const payload = {
+      // The payload key should match what the API controller expects (`price`, `stock`, etc.)
+      // which is the `field` from state.
+      [field]: field.includes("price") ? unformatNumber(editValue) : editValue,
+    };
+
+    const currentProduct = products.data.find((p) => p.product_id === rowId);
+    if (!currentProduct) return handleCancelEdit(); // Safety check
+
+    // Get the original value using the correct property name.
+    const originalValue = currentProduct[productPropertyName];
+
+    const newValue = field.includes("price")
+      ? unformatNumber(editValue)
+      : editValue;
+
+    // Check if the value has actually changed. Use `??` to handle `0` and `null` correctly.
+    if (String(originalValue ?? "") === String(newValue ?? "")) {
+      return handleCancelEdit();
+    }
+
+    // Validate stock value if it's being edited.
+    if (field === "stock") {
+      const newValueStock = parseInt(newValue, 10);
+      if (isNaN(newValueStock) || newValueStock < 0) {
+        toast.error("Stok harus berupa angka non-negatif.");
+        return; // Let user correct the value
+      }
+    }
+
+    const promise = api.put(`/products/admin/inline-edit/${rowId}`, payload);
+
+    toast.promise(promise, {
+      loading: "Menyimpan perubahan...",
+      success: (res) => {
+        handleCancelEdit();
+        fetchProducts({
+          page: currentPage,
+          limit: PRODUCTS_PER_PAGE,
+          search: debouncedSearchTerm,
+          category: selectedCategory === "All" ? "" : selectedCategory,
+          status: statusFilter === "all" ? "" : statusFilter,
+        });
+        return res.data.message || "Produk berhasil diperbarui!";
+      },
+      error: (err) =>
+        err.response?.data?.message || "Gagal menyimpan perubahan.",
+    });
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") handleSave();
+    else if (e.key === "Escape") handleCancelEdit();
+  };
 
   const handleCheckTiktokStatus = async (product) => {
     try {
@@ -109,7 +220,7 @@ const ProductList = () => {
           <div className="flex items-center justify-between flex-wrap gap-4">
             <p className="text-gray-600">
               Menampilkan {products.data?.length || 0} dari{" "}
-              {products.totalItems || 0} produk
+              {products.totalProducts || 0} produk
             </p>
             <button
               onClick={() => router.push("/admin/add-product")}
@@ -234,7 +345,7 @@ const ProductList = () => {
                     Status Tiktok
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Aksi
+                    Preview
                   </th>
                 </tr>
               </thead>
@@ -280,7 +391,14 @@ const ProductList = () => {
                 ) : products.data?.length > 0 ? (
                   products.data.map((product) => (
                     <tr key={product.product_id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td
+                        className="px-6 py-4 whitespace-nowrap cursor-pointer"
+                        onClick={() =>
+                          router.push(
+                            `/admin/product-list/${product.product_id}`
+                          )
+                        }
+                      >
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10">
                             <Image
@@ -315,23 +433,82 @@ const ProductList = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 font-medium">
-                          Rp{" "}
-                          {(product.product_price || 0).toLocaleString("id-ID")}
-                        </div>
+                        {editingCell.rowId === product.product_id &&
+                        editingCell.field === "price" ? (
+                          <input
+                            type="text"
+                            value={editValue}
+                            onChange={handleEditChange}
+                            onBlur={handleSave}
+                            onKeyDown={handleKeyDown}
+                            autoFocus
+                            className="w-28 px-2 py-1 border border-accent rounded-md text-sm"
+                          />
+                        ) : (
+                          <div
+                            onDoubleClick={() =>
+                              handleDoubleClick(product, "price")
+                            }
+                            className="text-sm text-gray-900 font-medium p-1 rounded-md cursor-pointer hover:bg-gray-100"
+                            title="Double-click untuk edit"
+                          >
+                            Rp{" "}
+                            {(product.product_price || 0).toLocaleString(
+                              "id-ID"
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap hidden md:table-cell">
-                        <div className="text-sm text-gray-900 font-medium">
-                          Rp{" "}
-                          {(product.product_price_tiktok || 0).toLocaleString(
-                            "id-ID"
-                          )}
-                        </div>
+                        {editingCell.rowId === product.product_id &&
+                        editingCell.field === "product_price_tiktok" ? (
+                          <input
+                            type="text"
+                            value={editValue}
+                            onChange={handleEditChange}
+                            onBlur={handleSave}
+                            onKeyDown={handleKeyDown}
+                            autoFocus
+                            className="w-28 px-2 py-1 border border-accent rounded-md text-sm"
+                          />
+                        ) : (
+                          <div
+                            onDoubleClick={() =>
+                              handleDoubleClick(product, "product_price_tiktok")
+                            }
+                            className="text-sm text-gray-900 font-medium p-1 rounded-md cursor-pointer hover:bg-gray-100"
+                            title="Double-click untuk edit"
+                          >
+                            Rp{" "}
+                            {(product.product_price_tiktok || 0).toLocaleString(
+                              "id-ID"
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                        <div className="text-sm text-gray-900">
-                          {product.product_stock ?? 0}
-                        </div>
+                        {editingCell.rowId === product.product_id &&
+                        editingCell.field === "stock" ? (
+                          <input
+                            type="number"
+                            value={editValue}
+                            onChange={handleEditChange}
+                            onBlur={handleSave}
+                            onKeyDown={handleKeyDown}
+                            autoFocus
+                            className="w-20 px-2 py-1 border border-accent rounded-md text-sm"
+                          />
+                        ) : (
+                          <div
+                            onDoubleClick={() =>
+                              handleDoubleClick(product, "stock")
+                            }
+                            className="text-sm text-gray-900 p-1 rounded-md cursor-pointer hover:bg-gray-100"
+                            title="Double-click untuk edit"
+                          >
+                            {product.product_stock ?? 0}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
@@ -389,51 +566,17 @@ const ProductList = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end space-x-2">
-                          {/* Preserved the detail button with original navigation */}
+                        <div className="flex items-center justify-end">
                           <button
                             onClick={() =>
                               router.push(
-                                `/admin/product-list/${product.product_id}`
+                                `/product/${product.product_id}`
                               )
                             }
-                            className="text-accent hover:text-accent/80"
-                            title="Detail"
+                            className="text-gray-600 hover:text-gray-900 cursor-pointer"
+                            title="Preview Produk"
                           >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-5 w-5"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
-                            >
-                              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                              <path
-                                fillRule="evenodd"
-                                d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                          </button>
-                          {/* Preserved the visit button with original navigation */}
-                          <button
-                            onClick={() =>
-                              router.push(`/product/${product.product_id}`)
-                            }
-                            className="text-gray-600 hover:text-gray-900"
-                            title="Lihat di Toko"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-5 w-5"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
+                            <FaEye />
                           </button>
                         </div>
                       </td>

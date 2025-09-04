@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import Image from "next/image";
 import { assets } from "@/assets/assets";
@@ -12,7 +12,8 @@ import api from "@/service/api";
 import Loading from "@/components/Loading";
 import { useSearchParams } from "next/navigation";
 
-const Account = () => {
+// Komponen terpisah yang menggunakan useSearchParams
+const AccountContent = () => {
   const { router } = useAppContext();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl");
@@ -239,6 +240,60 @@ const Account = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+// Loading fallback component khusus untuk Account
+const AccountLoadingFallback = () => {
+  return (
+    <div className="min-h-screen w-full flex bg-white relative">
+      {/* Left Column: Image Placeholder */}
+      <div className="hidden md:block w-1/2 relative">
+        <div className="w-full h-full bg-gray-200 animate-pulse" />
+      </div>
+
+      {/* Right Column: Form Placeholder */}
+      <div className="w-full md:w-1/2 flex items-center justify-center p-4 md:p-8">
+        <div className="max-w-md w-full space-y-8 bg-white p-6 md:p-10">
+          {/* Logo placeholder */}
+          <div className="mx-auto h-12 w-24 bg-gray-200 rounded animate-pulse" />
+
+          {/* Title placeholders */}
+          <div className="space-y-4">
+            <div className="h-8 bg-gray-200 rounded w-3/4 mx-auto animate-pulse" />
+            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto animate-pulse" />
+          </div>
+
+          {/* Role selector placeholder */}
+          <div className="h-12 bg-gray-100 rounded-full animate-pulse" />
+
+          {/* Form placeholders */}
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <div className="h-4 bg-gray-200 rounded w-16 animate-pulse" />
+              <div className="h-12 bg-gray-200 rounded animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-4 bg-gray-200 rounded w-20 animate-pulse" />
+              <div className="h-12 bg-gray-200 rounded animate-pulse" />
+            </div>
+            <div className="h-12 bg-gray-200 rounded animate-pulse" />
+          </div>
+
+          {/* Back button placeholder */}
+          <div className="h-8 bg-gray-200 rounded w-1/2 mx-auto animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Main component dengan Suspense wrapper
+const Account = () => {
+  return (
+    <Suspense fallback={<AccountLoadingFallback />}>
+      <AccountContent />
+    </Suspense>
   );
 };
 

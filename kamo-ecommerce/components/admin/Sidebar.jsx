@@ -22,6 +22,8 @@ import {
   FaChevronLeft,
   FaTimes,
   FaSignOutAlt,
+  FaTag
+  
 } from "react-icons/fa";
 import { BiSolidBookContent } from "react-icons/bi";
 const SideBar = ({
@@ -73,6 +75,11 @@ const SideBar = ({
           name: "Daftar Produk",
           path: "/admin/product-list",
           icon: <FaListAlt />,
+        },
+        {
+          name: "Produk Diskon",
+          path: "/admin/product-discount",
+          icon: <FaTag />,
         },
         {
           name: "Analisa Produk",

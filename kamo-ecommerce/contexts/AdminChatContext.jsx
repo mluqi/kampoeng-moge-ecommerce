@@ -91,15 +91,22 @@ export const AdminChatProvider = ({ children }) => {
     0
   );
 
-  const sendMessageFromAdmin = async (conversationId, content) => {
+  const sendMessageFromAdmin = async (conversationId, messageData) => {
     if (!conversationId) {
       throw new Error("ID percakapan tidak siap.");
     }
     try {
-      const res = await api.post("/chat/admin/messages", {
-        conversationId,
-        content,
-      });
+      const formData = new FormData();
+      formData.append("conversationId", conversationId);
+      formData.append("content", messageData.content || "");
+      if (messageData.productId) {
+        formData.append("product_id", messageData.productId);
+      }
+      if (messageData.image) {
+        formData.append("image", messageData.image);
+      }
+
+      const res = await api.post("/chat/admin/messages", formData);
       const sentMessage = res.data;
 
       // Update state secara lokal untuk memindahkan percakapan ke atas
@@ -109,7 +116,7 @@ export const AdminChatProvider = ({ children }) => {
 
         const updatedConvo = {
           ...prevConvos[convoIndex],
-          messages: [sentMessage],
+          messages: [sentMessage], // Backend kini mengembalikan pesan dengan detail produk
           lastMessageAt: sentMessage.createdAt,
         };
 

@@ -116,11 +116,15 @@ const OrderStatusTracker = ({ orderId, status, shippingNumber }) => {
         <h3 className="text-md font-semibold text-gray-700 mb-4">
           Riwayat Pengiriman
         </h3>
-        {isLoading && (
+        {isLoading ? (
           <p className="text-sm text-gray-500">Memuat riwayat...</p>
-        )}
-        {error && <p className="text-sm text-red-500">{error}</p>}
-        {trackingInfo && trackingInfo.history && (
+        ) : error ? (
+          <p className="text-sm text-red-500">{error}</p>
+        ) : status === "pending" ? (
+          <p className="text-sm text-gray-500">Belum ada pembayaran.</p>
+        ) : trackingInfo &&
+          trackingInfo.history &&
+          trackingInfo.history.length > 0 ? (
           <div className="relative pl-4 border-l-2 border-gray-200">
             {trackingInfo.history.map((item, index) => (
               <div key={index} className="mb-6 relative">
@@ -150,16 +154,11 @@ const OrderStatusTracker = ({ orderId, status, shippingNumber }) => {
               </div>
             ))}
           </div>
+        ) : (
+          <p className="text-sm text-gray-500">
+            Riwayat pengiriman akan tersedia setelah paket diproses oleh kurir.
+          </p>
         )}
-        {shippingNumber &&
-          !isLoading &&
-          !error &&
-          (!trackingInfo || !trackingInfo.history) && (
-            <p className="text-sm text-gray-500">
-              Riwayat pengiriman akan tersedia setelah paket diproses oleh
-              kurir.
-            </p>
-          )}
       </div>
     </div>
   );

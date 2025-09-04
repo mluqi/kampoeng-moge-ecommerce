@@ -1,17 +1,30 @@
 "use client";
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useProduct } from "@/contexts/ProductContext";
+import api from "@/service/api";
 import { useCategory } from "@/contexts/CategoryContext";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { assets } from "@/assets/assets";
-import { FiUpload, FiX, FiChevronDown, FiArrowLeft } from "react-icons/fi";
+import { FiX, FiChevronDown, FiArrowLeft } from "react-icons/fi";
 import toast from "react-hot-toast";
-import ProductTiktokActions from "@/components/admin/ProductTiktokActions";
-import TiktokStatusBadge from "@/components/admin/TiktokStatusBadge";
 import ProductTiktokSection from "@/components/admin/ProductTiktokSection";
 import dynamic from "next/dynamic";
 import "react-quill-new/dist/quill.snow.css";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { SortableImageItem } from "@/components/admin/SortableImageItem";
 
 // Import ReactQuill secara dinamis untuk menghindari masalah SSR
 const ReactQuill = dynamic(() => import("react-quill-new"), {
@@ -28,6 +41,7 @@ const ProductDetailEdit = () => {
   const params = useParams();
   const { id } = params;
   const router = useRouter();
+  const fileInputRef = useRef(null);
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -50,9 +64,10 @@ const ProductDetailEdit = () => {
     annotations: "",
     brand: "",
   });
-  const [existingPictures, setExistingPictures] = useState([]);
-  const [newFiles, setNewFiles] = useState([]);
-  const [markedForRemoval, setMarkedForRemoval] = useState([]);
+
+  // State for sortable images
+  const [imageItems, setImageItems] = useState([]);
+  const [activeId, setActiveId] = useState(null);
 
   // Parse dimension into separate fields for better UX
   const [dimensionValues, setDimensionValues] = useState({
@@ -96,14 +111,22 @@ const ProductDetailEdit = () => {
     setLoading(true);
 
     const loadProduct = async () => {
-      const fetched = await fetchProductById(id);
+      // Panggil API secara langsung dengan parameter 'from=admin'
+      // untuk memastikan produk non-aktif tetap bisa diakses di halaman ini.
+      const response = await api.get(`/products/${id}`, {
+        params: { from: "admin" },
+      });
+      const fetched = response.data;
       if (isMounted && fetched) {
         setProduct(fetched);
-        setExistingPictures(
-          Array.isArray(fetched.product_pictures)
-            ? fetched.product_pictures
-            : []
-        );
+
+        // Initialize sortable image items
+        const initialImages = (fetched.product_pictures || []).map((url) => ({
+          id: url, // Use URL as a unique ID for existing images
+          type: "existing",
+          payload: url, // The URL string
+        }));
+        setImageItems(initialImages);
 
         // Parse dimension if it exists
         let dimensionData = { length: "", width: "", height: "" };
@@ -153,7 +176,9 @@ const ProductDetailEdit = () => {
           description: fetched.product_description || "",
           sku: fetched.product_sku || "",
           price: formatNumber(fetched.product_price),
-          product_price_tiktok: formatNumber(fetched.product_price_tiktok || ""),
+          product_price_tiktok: formatNumber(
+            fetched.product_price_tiktok || ""
+          ),
           stock: fetched.product_stock || "",
           condition: fetched.product_condition || "Baru",
           status: fetched.product_status || "active",
@@ -244,7 +269,7 @@ const ProductDetailEdit = () => {
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
     const remainingSlots =
-      5 - (existingPictures.length - markedForRemoval.length + newFiles.length);
+      9 - (existingPictures.length - markedForRemoval.length + newFiles.length);
 
     if (files.length > remainingSlots) {
       toast.error(`Anda hanya dapat menambahkan ${remainingSlots} gambar lagi`);
@@ -282,6 +307,69 @@ const ProductDetailEdit = () => {
     });
   };
 
+  // --- DND Kit Handlers ---
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragStart = (event) => {
+    setActiveId(event.active.id);
+  };
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (active.id !== over.id) {
+      setImageItems((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+    setActiveId(null);
+  };
+
+  const handleFileSelect = (selectedFiles) => {
+    const validFiles = Array.from(selectedFiles).filter(
+      (file) =>
+        file.type.startsWith("image/") && file.size <= 5 * 1024 * 1024
+    );
+
+    if (validFiles.length !== selectedFiles.length) {
+      toast.error(
+        "Beberapa file tidak valid (melebihi 5MB atau bukan gambar)."
+      );
+    }
+
+    const newImageItems = validFiles.map((file) => ({
+      id: `${file.name}-${file.lastModified}`,
+      type: "new",
+      payload: file,
+    }));
+
+    setImageItems((prev) => [...prev, ...newImageItems].slice(0, 9));
+  };
+
+  const handleRemoveImage = (idToRemove) => {
+    setImageItems((prev) => prev.filter((item) => item.id !== idToRemove));
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileSelect(e.dataTransfer.files);
+      e.dataTransfer.clearData();
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -317,14 +405,13 @@ const ProductDetailEdit = () => {
       );
     }
 
-    existingPictures.forEach((pic, idx) => {
-      if (!markedForRemoval.includes(idx)) {
-        // console.log("existingPictures[]", pic);
-        formData.append("existingPictures[]", pic);
+    // Process sorted images
+    imageItems.forEach((item) => {
+      if (item.type === "existing") {
+        formData.append("existingPictures[]", item.payload);
+      } else {
+        formData.append("pictures", item.payload);
       }
-    });
-    newFiles.forEach((file) => {
-      formData.append("pictures", file);
     });
 
     try {
@@ -332,15 +419,16 @@ const ProductDetailEdit = () => {
       if (success) {
         toast.success("Produk berhasil diperbarui");
         setEditMode(false);
-        setNewFiles([]);
-        setMarkedForRemoval([]);
         // refresh data
         const refreshed = await fetchProductById(id);
         setProduct(refreshed);
-        setExistingPictures(
-          Array.isArray(refreshed.product_pictures)
-            ? refreshed.product_pictures
-            : []
+        // Re-initialize image items from the newly saved data
+        setImageItems(
+          (refreshed.product_pictures || []).map((url) => ({
+            id: url,
+            type: "existing",
+            payload: url,
+          }))
         );
       } else {
         toast.error("Gagal memperbarui produk");
@@ -378,7 +466,7 @@ const ProductDetailEdit = () => {
         <p>Produk tidak ditemukan</p>
         <button
           onClick={() => router.push("/admin/product-list")}
-          className="mt-4 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 flex items-center gap-2"
+          className="mt-4 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 flex items-center gap-2 cursor-pointer"
         >
           <FiArrowLeft /> Kembali ke Daftar Produk
         </button>
@@ -386,9 +474,7 @@ const ProductDetailEdit = () => {
     );
   }
 
-  const totalImages =
-    existingPictures.length - markedForRemoval.length + newFiles.length;
-  const canAddMoreImages = totalImages < 5;
+  const canAddMoreImages = imageItems.length < 9;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -409,7 +495,7 @@ const ProductDetailEdit = () => {
               <div className="flex justify-between items-start mb-8">
                 <div>
                   <h1 className="text-2xl font-bold text-gray-800">
-                    {product.product_name}
+                    {product?.product_name}
                   </h1>
                   <p className="text-gray-500 mt-1">
                     {product.product_sku || "No SKU"}
@@ -429,12 +515,12 @@ const ProductDetailEdit = () => {
                   <h2 className="text-lg font-semibold mb-4 text-gray-700">
                     Gambar Produk
                   </h2>
-                  {existingPictures.length > 0 ? (
+                  {imageItems.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                      {existingPictures.map((pic, idx) => (
+                      {imageItems.map((item, idx) => (
                         <div key={idx} className="relative aspect-square">
                           <Image
-                            src={pic.startsWith("http") ? pic : baseUrl + pic}
+                            src={baseUrl + item.payload}
                             alt={`product-${idx}`}
                             fill
                             className="rounded-lg object-cover border"
@@ -483,7 +569,9 @@ const ProductDetailEdit = () => {
                         <p className="text-sm text-gray-500">Harga TikTok</p>
                         <p className="font-medium">
                           Rp{" "}
-                          {(product.product_price_tiktok || 0).toLocaleString("id-ID")}
+                          {(product.product_price_tiktok || 0).toLocaleString(
+                            "id-ID"
+                          )}
                         </p>
                       </div>
                       <div>
@@ -629,117 +717,62 @@ const ProductDetailEdit = () => {
               <div className="space-y-6">
                 {/* Image Management */}
                 <div>
-                  <h2 className="text-lg font-semibold mb-4 text-gray-700">
-                    Kelola Gambar Produk
+                  <h2 className="text-lg font-medium text-gray-700 mb-3">
+                    Gambar Produk (Maks. 9, bisa diurutkan)
                   </h2>
-                  <div className="space-y-4">
-                    {/* Existing Images */}
-                    {existingPictures.length > 0 && (
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-700 mb-2">
-                          Gambar Saat Ini (
-                          {existingPictures.length - markedForRemoval.length}/
-                          {existingPictures.length} dipilih)
-                        </h3>
-                        <div className="grid grid-cols-3 gap-3">
-                          {existingPictures.map((pic, idx) => (
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg"
+                  >
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={imageItems.map((item) => item.id)}
+                      >
+                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-4">
+                          {imageItems.map((item) => (
+                            <SortableImageItem
+                              key={item.id}
+                              id={item.id}
+                              src={
+                                item.type === "new"
+                                  ? URL.createObjectURL(item.payload)
+                                  : baseUrl + item.payload
+                              }
+                              onRemove={() => handleRemoveImage(item.id)}
+                            />
+                          ))}
+                          {canAddMoreImages && (
                             <div
-                              key={idx}
-                              className={`relative aspect-square rounded-lg overflow-hidden border-2 ${
-                                markedForRemoval.includes(idx)
-                                  ? "border-red-500 opacity-60"
-                                  : "border-transparent"
-                              }`}
+                              onClick={() => fileInputRef.current.click()}
+                              className="w-full aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-accent transition-colors text-gray-500 hover:text-accent"
                             >
                               <Image
-                                src={
-                                  pic.startsWith("http") ? pic : baseUrl + pic
-                                }
-                                alt={`existing-${idx}`}
-                                fill
-                                className="object-cover"
+                                src={assets.upload_area}
+                                alt="Upload"
+                                width={40}
+                                height={40}
+                                className="opacity-60"
                               />
-                              <button
-                                type="button"
-                                onClick={() => toggleMarkForRemoval(idx)}
-                                className={`absolute top-2 right-2 p-1 rounded-full ${
-                                  markedForRemoval.includes(idx)
-                                    ? "bg-red-500 text-white"
-                                    : "bg-white text-gray-700 shadow-sm"
-                                }`}
-                              >
-                                <FiX size={16} />
-                              </button>
+                              <p className="text-xs mt-2">Tambah Gambar</p>
                             </div>
-                          ))}
+                          )}
                         </div>
-                      </div>
-                    )}
-
-                    {/* New Images */}
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-700 mb-2">
-                        Gambar Baru ({newFiles.length} dipilih)
-                      </h3>
-                      {newFiles.length > 0 ? (
-                        <div className="grid grid-cols-3 gap-3">
-                          {newFiles.map((file, idx) => (
-                            <div
-                              key={idx}
-                              className="relative aspect-square rounded-lg overflow-hidden border border-gray-200"
-                            >
-                              <Image
-                                src={URL.createObjectURL(file)}
-                                alt={`new-${idx}`}
-                                fill
-                                className="object-cover"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeNewFile(idx)}
-                                className="absolute top-2 right-2 p-1 bg-white text-gray-700 rounded-full shadow-sm"
-                              >
-                                <FiX size={16} />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-400">
-                          Belum ada gambar baru
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Upload New */}
-                    {canAddMoreImages && (
-                      <div>
-                        <label className="block w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-accent transition-colors">
-                          <div className="flex flex-col items-center p-4">
-                            <FiUpload className="w-6 h-6 text-gray-400 mb-2" />
-                            <p className="text-sm text-gray-600 text-center">
-                              <span className="font-medium">
-                                Klik untuk upload
-                              </span>{" "}
-                              atau drag & drop
-                            </p>
-                            <p className="text-xs text-gray-400 mt-1">
-                              Maksimal 2MB per gambar
-                            </p>
-                          </div>
-                          <input
-                            type="file"
-                            multiple
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleFileChange}
-                          />
-                        </label>
-                        <p className="text-xs text-gray-500 mt-2">
-                          Anda dapat menambahkan {5 - totalImages} gambar lagi
-                        </p>
-                      </div>
-                    )}
+                      </SortableContext>
+                    </DndContext>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={(e) => handleFileSelect(e.target.files)}
+                      multiple
+                      accept="image/*"
+                      className="hidden"
+                    />
                   </div>
                 </div>
 

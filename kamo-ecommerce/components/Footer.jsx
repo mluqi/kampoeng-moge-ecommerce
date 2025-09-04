@@ -53,7 +53,7 @@ const Footer = () => {
                 </a>
               </li>
               <li>
-                <a className="hover:underline transition" href="/shop">
+                <a className="hover:underline transition" href="/all-products">
                   Belanja
                 </a>
               </li>

@@ -7,13 +7,16 @@ import {
   FaCommentDots,
   FaPaperPlane,
   FaTimes,
-  FaQuestionCircle,
-  FaPhone,
+  FaImage,
+  FaExclamationTriangle,
 } from "react-icons/fa";
 import Image from "next/image";
 import { assets } from "@/assets/assets";
 import ProductInfoCard from "@/components/ProductInfoCard";
+import ImagePreviewModal from "@/components/ImagePreviewModal";
 import { AnimatePresence, motion } from "framer-motion";
+
+const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 const ChatWidget = () => {
   const router = useRouter();
@@ -30,7 +33,11 @@ const ChatWidget = () => {
   } = useChat();
 
   const { profile } = useUserAuth();
+  const [imageToSend, setImageToSend] = useState(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState(null);
+  const [brokenImages, setBrokenImages] = useState(new Set());
   const messagesEndRef = useRef(null);
+  const imageInputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -42,18 +49,43 @@ const ChatWidget = () => {
     }
   }, [messages, isOpen]);
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
-    if (newMessage.trim() && isChatReady) {
-      sendMessage(newMessage);
+    if ((!newMessage.trim() && !imageToSend) || !isChatReady) return;
+
+    try {
+      await sendMessage({ content: newMessage, image: imageToSend });
       setNewMessage("");
+      setImageToSend(null);
+    } catch (error) {
+      console.error("Gagal mengirim pesan dari widget:", error);
     }
+  };
+
+  const handleImageChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      // Anda bisa menambahkan validasi ukuran atau tipe file di sini
+      setImageToSend(file);
+    }
+  };
+
+  const handleImageClick = (url) => {
+    setPreviewImageUrl(url);
+  };
+
+  const handleImageError = (url) => {
+    setBrokenImages((prev) => new Set(prev).add(url));
   };
 
   if (!profile) return null;
 
   return (
     <>
+      <ImagePreviewModal
+        imageUrl={previewImageUrl}
+        onClose={() => setPreviewImageUrl(null)}
+      />
       <div className="fixed lg:bottom-6 md:bottom-6 bottom-20 right-6 z-50 ">
         <button
           onClick={toggleChat}
@@ -133,7 +165,14 @@ const ChatWidget = () => {
                 // Jika pesan memiliki data produk, tampilkan kartu DAN pesannya.
                 if (msg.product) {
                   return (
-                    <div key={msg.id} className="space-y-2">
+                    <div
+                      key={msg.id}
+                      className={`flex flex-col gap-2 ${
+                        msg.sender_role === "user"
+                          ? "items-end"
+                          : "items-start"
+                      }`}
+                    >
                       <div className="flex justify-center">
                         <ProductInfoCard
                           product={msg.product}
@@ -144,14 +183,7 @@ const ChatWidget = () => {
                           className="w-full max-w-xs border border-gray-200"
                         />
                       </div>
-                      {/* Pesan teks yang menyertainya */}
-                      <div
-                        className={`flex items-end ${
-                          msg.sender_role === "user"
-                            ? "justify-end"
-                            : "justify-start"
-                        }`}
-                      >
+                      {msg.content && (
                         <div
                           className={`max-w-xs md:max-w-md px-4 py-2 rounded-xl shadow-sm ${
                             msg.sender_role === "user"
@@ -159,14 +191,8 @@ const ChatWidget = () => {
                               : "bg-white text-gray-800 rounded-bl-none border border-gray-200"
                           }`}
                         >
-                          <p
-                            className="text-sm"
-                            style={{
-                              whiteSpace: "pre-wrap",
-                              wordBreak: "break-word",
-                            }}
-                          >
-                            {msg.content}
+                          <p className="text-sm whitespace-pre-wrap break-word">
+                            {msg.content}{" "}
                           </p>
                           <div className="text-right text-xs mt-1 opacity-70">
                             {new Date(msg.createdAt).toLocaleTimeString(
@@ -178,7 +204,7 @@ const ChatWidget = () => {
                             )}
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 }
@@ -193,27 +219,49 @@ const ChatWidget = () => {
                         : "justify-start"
                     }`}
                   >
-                    <div
-                      className={`max-w-xs md:max-w-md px-4 py-2 rounded-xl shadow-sm ${
-                        msg.sender_role === "user"
-                          ? "bg-accent text-white rounded-br-none"
-                          : "bg-white text-gray-800 rounded-bl-none border border-gray-200"
-                      }`}
-                    >
-                      <p
-                        className="text-sm"
-                        style={{
-                          whiteSpace: "pre-wrap",
-                          wordBreak: "break-word",
-                        }}
+                    <div className="flex flex-col gap-1 items-end">
+                      {msg.image_url &&
+                        (brokenImages.has(baseUrl + msg.image_url) ? (
+                          <div className="flex items-center gap-2 p-3 bg-gray-200 border border-dashed border-gray-300 rounded-lg text-gray-600 w-48">
+                            <FaExclamationTriangle className="text-yellow-500 flex-shrink-0" />
+                            <span className="text-sm">
+                              Gambar tidak tersedia
+                            </span>
+                          </div>
+                        ) : (
+                          <div
+                            className="relative w-48 h-48 cursor-pointer"
+                            onClick={() =>
+                              handleImageClick(baseUrl + msg.image_url)
+                            }
+                          >
+                            <Image
+                              src={baseUrl + msg.image_url}
+                              alt="Gambar chat"
+                              layout="fill"
+                              className="rounded-lg object-cover"
+                              onError={() =>
+                                handleImageError(baseUrl + msg.image_url)
+                              }
+                            />
+                          </div>
+                        ))}
+                      <div
+                        className={`max-w-xs md:max-w-md px-4 py-2 rounded-xl shadow-sm ${
+                          msg.sender_role === "user"
+                            ? "bg-accent text-white rounded-br-none"
+                            : "bg-white text-gray-800 rounded-bl-none border border-gray-200"
+                        }`}
                       >
-                        {msg.content}
-                      </p>
-                      <div className="text-right text-xs mt-1 opacity-70">
-                        {new Date(msg.createdAt).toLocaleTimeString("id-ID", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        <p className="text-sm whitespace-pre-wrap break-word">
+                          {msg.content}
+                        </p>
+                        <div className="text-right text-xs mt-1 opacity-70">
+                          {new Date(msg.createdAt).toLocaleTimeString("id-ID", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -223,31 +271,53 @@ const ChatWidget = () => {
             </div>
 
             {/* Quick links */}
-            {/* <div className="flex border-t border-gray-200 bg-gray-100">
-              <button className="flex-1 py-2 text-xs text-gray-600 hover:text-accent flex items-center justify-center gap-1">
-                <FaQuestionCircle /> FAQ
-              </button>
-              <button className="flex-1 py-2 text-xs text-gray-600 hover:text-accent flex items-center justify-center gap-1">
-                <FaPhone /> Contact Us
-              </button>
-            </div> */}
 
             {/* Input area */}
             <div className="p-4 border-t border-gray-200 bg-white">
+              {imageToSend && (
+                <div className="relative w-20 h-20 mb-2 border rounded-md p-1">
+                  <Image
+                    src={URL.createObjectURL(imageToSend)}
+                    alt="Preview"
+                    layout="fill"
+                    className="object-cover rounded"
+                  />
+                  <button
+                    onClick={() => setImageToSend(null)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
+                  >
+                    <FaTimes size={10} />
+                  </button>
+                </div>
+              )}
               <form onSubmit={handleSend} className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current.click()}
+                  className="p-2 text-gray-500 hover:text-accent transition-colors disabled:opacity-50"
+                  disabled={!isChatReady}
+                >
+                  <FaImage size={20} />
+                </button>
+                <input
+                  type="file"
+                  ref={imageInputRef}
+                  onChange={handleImageChange}
+                  accept="image/*"
+                  className="hidden"
+                />
                 <input
                   type="text"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Type a message..."
-                  className="flex-1 p-3 border border-gray-300 rounded-full text-base md:text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="flex-1 p-3 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-accent"
                   disabled={!isChatReady}
-                  style={{ fontSize: "16px" }} // Tambahkan ini
                 />
                 <button
                   type="submit"
                   className="bg-accent text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-accent/90 disabled:bg-gray-300"
-                  disabled={!isChatReady || !newMessage.trim()}
+                  disabled={!isChatReady || (!newMessage.trim() && !imageToSend)}
                 >
                   <FaPaperPlane size={16} />
                 </button>

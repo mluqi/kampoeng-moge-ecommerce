@@ -97,6 +97,24 @@ const AdminChatPage = () => {
     }
   };
 
+  // [BARU] Handler untuk mengirim pesan dengan produk
+  const handleSendProductMessage = async (productId) => {
+    if (!selectedConversationId) return;
+    try {
+      const messageContent = "Silakan lihat produk ini.";
+      const sentMessage = await sendMessageFromAdmin(
+        selectedConversationId,
+        messageContent,
+        productId
+      );
+      // Tambahkan pesan produk ke state messages untuk update UI real-time
+      setMessages((prev) => [...prev, sentMessage]);
+    } catch (error) {
+      console.error("Gagal mengirim pesan produk dari halaman chat:", error);
+      // Anda bisa menambahkan toast error di sini jika perlu
+    }
+  };
+
   if (loadingConversations) {
     return <Loading />;
   }
@@ -124,9 +142,12 @@ const AdminChatPage = () => {
         <ChatWindow
           messages={messages}
           onSendMessage={handleSendMessage}
+          onSendProduct={handleSendProductMessage}
           adminId={admin?.id}
           loading={loadingMessages}
-          selectedConversation={conversations.find(c => c.id === selectedConversationId)}
+          selectedConversation={conversations.find(
+            (c) => c.id === selectedConversationId
+          )}
           onBack={() => setSelectedConversationId(null)}
         />
       </div>

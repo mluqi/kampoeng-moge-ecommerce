@@ -6,15 +6,29 @@ import toast from "react-hot-toast";
 
 const CartContext = createContext();
 
+const CART_SELECTION_KEY = "kamo_cart_selection";
+
 export const CartProvider = ({ children }) => {
   const { user } = useUserAuth();
   const [cartItems, setCartItems] = useState([]);
-  const [selectedItems, setSelectedItems] = useState([]);
+  const [selectedItems, setSelectedItems] = useState(() => {
+    if (typeof window === "undefined") {
+      return [];
+    }
+    try {
+      const item = window.sessionStorage.getItem(CART_SELECTION_KEY);
+      return item ? JSON.parse(item) : [];
+    } catch (error) {
+      console.error("Gagal membaca item terpilih dari sessionStorage", error);
+      return [];
+    }
+  });
   const [loading, setLoading] = useState(true);
 
   const fetchCart = async () => {
     if (!user) {
       setCartItems([]);
+      // Jangan reset selectedItems di sini agar pilihan tetap ada saat re-login
       setLoading(false);
       return;
     }
@@ -23,9 +37,15 @@ export const CartProvider = ({ children }) => {
       const res = await api.get("/cart");
       const cartData = res.data || [];
       setCartItems(cartData);
-      // Secara default, pilih semua item yang stoknya tersedia saat keranjang dimuat
-      const inStockItems = cartData.filter(item => item.product.product_stock > 0);
-      setSelectedItems(inStockItems.map((item) => item.product_id));
+      // Validasi item yang dipilih: hapus item yang sudah tidak ada di keranjang atau stoknya habis
+      const validInStockIds = new Set(
+        cartData
+          .filter((item) => item.product.product_stock > 0)
+          .map((item) => item.product_id)
+      );
+      setSelectedItems((currentSelected) =>
+        currentSelected.filter((id) => validInStockIds.has(id))
+      );
     } catch (error) {
       console.error("Failed to fetch cart", error);
       setCartItems([]);
@@ -37,6 +57,17 @@ export const CartProvider = ({ children }) => {
   useEffect(() => {
     fetchCart();
   }, [user]);
+
+  // Simpan item yang dipilih ke sessionStorage setiap kali berubah
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        window.sessionStorage.setItem(CART_SELECTION_KEY, JSON.stringify(selectedItems));
+      } catch (error) {
+        console.error("Gagal menyimpan item terpilih ke sessionStorage", error);
+      }
+    }
+  }, [selectedItems]);
 
   const addToCart = async (productId, quantity = 1) => {
     if (!user) {
@@ -111,25 +142,52 @@ export const CartProvider = ({ children }) => {
     setSelectedItems([]);
   };
 
-  const cartCount = useMemo(() => cartItems.reduce((total, item) => total + item.quantity, 0), [cartItems]);
-  const cartTotal = useMemo(() => cartItems.reduce((total, item) => total + item.product.product_price * item.quantity, 0), [cartItems]);
-
-  const selectedCartTotal = useMemo(
-    () =>
-      cartItems
-        .filter((item) => selectedItems.includes(item.product_id))
-        .reduce(
-          (total, item) =>
-            total + item.product.product_price * item.quantity,
-          0
-        ),
-    [cartItems, selectedItems]
+  const cartCount = useMemo(
+    () => cartItems.reduce((total, item) => total + item.quantity, 0),
+    [cartItems]
   );
+  const cartTotal = useMemo(() => {
+    return cartItems.reduce((total, item) => {
+      const priceToUse = item.product.product_is_discount
+        ? item.product.product_discount_price
+        : item.product.product_price;
+      return total + priceToUse * item.quantity;
+    }, 0);
+  }, [cartItems]);
+
+  const selectedCartTotal = useMemo(() => {
+    return selectedItems.reduce((total, productId) => {
+      const item = cartItems.find(
+        (cartItem) => cartItem.product_id === productId
+      );
+      if (item) {
+        // Tentukan harga yang akan digunakan
+        const priceToUse = item.product.product_is_discount
+          ? item.product.product_discount_price
+          : item.product.product_price;
+
+        // Gunakan priceToUse untuk kalkulasi
+        return total + priceToUse * item.quantity;
+      }
+      return total;
+    }, 0);
+  }, [selectedItems, cartItems]);
 
   const value = {
-    cartItems, loading, fetchCart, addToCart, updateCartItem, removeFromCart, cartCount, cartTotal,
-    selectedItems, toggleSelectItem, selectAllItems, deselectAllItems, clearCartState,
-    selectedCartTotal
+    cartItems,
+    loading,
+    fetchCart,
+    addToCart,
+    updateCartItem,
+    removeFromCart,
+    cartCount,
+    cartTotal,
+    selectedItems,
+    toggleSelectItem,
+    selectAllItems,
+    deselectAllItems,
+    clearCartState,
+    selectedCartTotal,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

@@ -89,17 +89,21 @@ export const ChatProvider = ({ children }) => {
   }, [fetchConversation]);
 
   // Mengirim pesan
-  const sendMessage = async (messageData) => {
+  const sendMessage = async (messageData) => { // messageData bisa berupa { content, image, product_id }
     if (!conversation) return;
 
-    const payload =
-      typeof messageData === "string" ? { content: messageData } : messageData;
+    const formData = new FormData();
+    formData.append("conversationId", conversation.id);
+    formData.append("content", messageData.content || "");
+    if (messageData.product_id) {
+      formData.append("product_id", messageData.product_id);
+    }
+    if (messageData.image) {
+      formData.append("image", messageData.image);
+    }
 
     try {
-      const res = await api.post("/chat/messages", {
-        ...payload,
-        conversationId: conversation.id,
-      });
+      const res = await api.post("/chat/messages", formData);
       setMessages((prev) => [...prev, res.data]);
     } catch (error) {
       console.error("Failed to send message", error);

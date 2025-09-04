@@ -1,10 +1,22 @@
 "use client";
 import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FaPaperPlane, FaUser, FaArrowLeft } from "react-icons/fa";
+import {
+  FaPaperPlane,
+  FaUser,
+  FaArrowLeft,
+  FaPlusCircle,
+  FaImage,
+  FaTimes,
+  FaExclamationTriangle,
+} from "react-icons/fa";
 import Image from "next/image";
 import ProductInfoCard from "@/components/ProductInfoCard";
 import Loading from "../Loading";
+import ProductSelectionModal from "./ProductSelectionModal";
+import ImagePreviewModal from "../ImagePreviewModal"; // [BARU] Impor modal preview gambar
+
+const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 const ChatWindow = ({
   messages,
@@ -13,13 +25,19 @@ const ChatWindow = ({
   loading,
   selectedConversation,
   onBack,
+  onSendProduct,
 }) => {
   const [newMessage, setNewMessage] = useState("");
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState(null); // [BARU] State untuk URL gambar preview
+  const [brokenImages, setBrokenImages] = useState(new Set());
+  const [imageToSend, setImageToSend] = useState(null); // [BARU] State untuk gambar
   const [isSending, setIsSending] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const imageInputRef = useRef(null); // [BARU] Ref untuk input file
   const router = useRouter();
 
   const scrollToBottom = () => {
@@ -61,9 +79,11 @@ const ChatWindow = ({
     if (!newMessage.trim() || isSending) return;
 
     setIsSending(true);
+    const messageData = { content: newMessage, image: imageToSend };
     try {
-      await onSendMessage(newMessage);
+      await onSendMessage(messageData);
       setNewMessage("");
+      setImageToSend(null); // Reset gambar setelah dikirim
     } catch (error) {
       console.error("Failed to send message:", error);
     } finally {
@@ -76,6 +96,40 @@ const ChatWindow = ({
       e.preventDefault();
       handleSend(e);
     }
+  };
+
+  const handleSelectProduct = async (productId) => {
+    if (!productId) return;
+
+    setIsSending(true);
+    setIsProductModalOpen(false); // Tutup modal setelah produk dipilih
+    const messageData = { content: "Silakan lihat produk ini.", productId };
+    try {
+      await onSendProduct(messageData);
+    } catch (error) {
+      console.error("Failed to send product message:", error);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // [BARU] Handler untuk memilih gambar
+  const handleImageChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      // Anda bisa menambahkan validasi ukuran atau tipe file di sini
+      setImageToSend(file);
+    }
+  };
+
+  // [BARU] Handler untuk membuka modal preview gambar
+  const handleImageClick = (url) => {
+    setPreviewImageUrl(url);
+  };
+
+  // [BARU] Handler untuk gambar yang gagal dimuat
+  const handleImageError = (url) => {
+    setBrokenImages((prev) => new Set(prev).add(url));
   };
 
   const formatTime = (timestamp) => {
@@ -169,6 +223,16 @@ const ChatWindow = ({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-gray-50">
+      {/* [BARU] Render modal preview gambar */}
+      <ImagePreviewModal
+        imageUrl={previewImageUrl}
+        onClose={() => setPreviewImageUrl(null)}
+      />
+      <ProductSelectionModal
+        isOpen={isProductModalOpen}
+        onClose={() => setIsProductModalOpen(false)}
+        onSelectProduct={handleSelectProduct}
+      />
       {/* Header */}
       {selectedConversation && (
         <div className="bg-white border-b p-4 shadow-sm">
@@ -256,6 +320,39 @@ const ChatWindow = ({
                         />
                       )}
 
+                      {/* [BARU] Render Gambar jika ada */}
+                      {msg.image_url &&
+                        (brokenImages.has(baseUrl + msg.image_url) ? (
+                          <div
+                            className="mt-2 flex items-center gap-2 p-3 bg-gray-100 border border-dashed border-gray-200 rounded-lg text-gray-500"
+                            style={{ maxWidth: "300px" }}
+                          >
+                            <FaExclamationTriangle className="text-yellow-500 flex-shrink-0" />
+                            <span className="text-sm">
+                              Gambar tidak tersedia
+                            </span>
+                          </div>
+                        ) : (
+                          <div
+                            className="mt-2 relative cursor-pointer"
+                            onClick={() =>
+                              handleImageClick(baseUrl + msg.image_url)
+                            }
+                            style={{ maxWidth: "300px", maxHeight: "300px" }}
+                          >
+                            <Image
+                              src={baseUrl + msg.image_url}
+                              alt="Gambar chat"
+                              height={200}
+                              width={200}
+                              className="rounded-lg object-cover max-w-xs"
+                              onError={() =>
+                                handleImageError(baseUrl + msg.image_url)
+                              }
+                            />
+                          </div>
+                        ))}
+
                       {/* The message bubble itself */}
                       <div
                         className={`max-w-[80%] md:max-w-lg px-4 py-2 rounded-2xl shadow-sm ${
@@ -287,7 +384,47 @@ const ChatWindow = ({
 
       {/* Input */}
       <div className="p-4 bg-white border-t">
-        <form onSubmit={handleSend} className="flex items-end gap-3">
+        {/* [BARU] Image Preview */}
+        {imageToSend && (
+          <div className="relative w-24 h-24 mb-2 border rounded-md p-1">
+            <Image
+              src={URL.createObjectURL(imageToSend)}
+              alt="Preview"
+              layout="fill"
+              className="object-cover rounded"
+            />
+            <button
+              onClick={() => setImageToSend(null)}
+              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
+            >
+              <FaTimes size={10} />
+            </button>
+          </div>
+        )}
+        <form onSubmit={handleSend} className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsProductModalOpen(true)}
+            className="p-2 text-gray-500 hover:text-accent transition-colors disabled:opacity-50"
+            disabled={isSending || !selectedConversation}
+          >
+            <FaPlusCircle size={22} />
+          </button>
+          <button
+            type="button"
+            onClick={() => imageInputRef.current.click()}
+            className="p-2 text-gray-500 hover:text-accent transition-colors disabled:opacity-50"
+            disabled={isSending || !selectedConversation}
+          >
+            <FaImage size={22} />
+          </button>
+          <input
+            type="file"
+            ref={imageInputRef}
+            onChange={handleImageChange}
+            accept="image/*"
+            className="hidden"
+          />
           <div className="flex-1">
             <textarea
               ref={inputRef}

@@ -573,7 +573,7 @@ const CheckoutPage = () => {
                   <h2 className="text-xl font-semibold text-gray-800 mb-6 border-b pb-4">
                     Ringkasan Pesanan
                   </h2>
-                  <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
+                  <div className="space-y-4 max-h-72 overflow-y-auto pr-2">
                     {itemsToCheckout.map((item) => (
                       <div key={item.id} className="flex items-center gap-4">
                         <div className="relative w-16 h-16 rounded-md overflow-hidden bg-gray-100">
@@ -585,25 +585,53 @@ const CheckoutPage = () => {
                             }
                             alt={item.product.product_name}
                             fill
-                            className="object-cover"
+                            className="object-cover w-5 h-5"
                           />
-                          <span className="absolute -top-2 -right-2 bg-gray-800 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                            {item.quantity}
-                          </span>
                         </div>
-                        <div className="flex-grow">
-                          <p className="text-sm font-medium text-gray-800 line-clamp-1">
-                            {item.product.product_name}
+                        <div className="flex-grow min-w-0">
+                          <p className="text-sm font-medium text-gray-800 line-clamp-3">
+                            {item.product.product_name}{" "}
+                            <span className="text-gray-500 font-normal">
+                              x{item.quantity}
+                            </span>
                           </p>
-                          <p className="text-xs text-gray-500">
-                            Rp{" "}
-                            {item.product.product_price.toLocaleString("id-ID")}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            {item.product.product_is_discount && (
+                              <p className="text-xs text-gray-400 line-through">
+                                Rp{" "}
+                                {item.product.product_price.toLocaleString(
+                                  "id-ID"
+                                )}
+                              </p>
+                            )}
+                            {item.product.product_is_discount && (
+                              <p className="text-xs text-[#F84B62] font-medium bg-[#F84B62]/10 px-2 rounded-lg mt-1">
+                                {item.product.product_discount_percentage}%
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <span
+                              className={`${
+                                item.product.product_is_discount
+                                  ? "text-[#F84B62] font-semibold"
+                                  : "text-gray-500"
+                              }`}
+                            >
+                              Rp{" "}
+                              {(item.product.product_is_discount
+                                ? item.product.product_discount_price
+                                : item.product.product_price
+                              ).toLocaleString("id-ID")}
+                            </span>
+                          </div>
                         </div>
-                        <p className="text-sm font-semibold">
+                        <p className="text-sm font-semibold whitespace-nowrap">
                           Rp{" "}
                           {(
-                            item.product.product_price * item.quantity
+                            (item.product.product_is_discount
+                              ? item.product.product_discount_price
+                              : item.product.product_price) * item.quantity
                           ).toLocaleString("id-ID")}
                         </p>
                       </div>
@@ -686,7 +714,7 @@ const CheckoutPage = () => {
                     }
                     className="w-full mt-6 bg-accent text-white py-3 rounded-md hover:bg-accent/90 transition font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
-                    Buat Pesanan
+                    Bayar Sekarang
                   </button>
                 </div>
               </div>

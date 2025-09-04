@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
 import { useCategory } from "@/contexts/CategoryContext";
-import { FaPencilAlt, FaTrashAlt, FaGripVertical } from "react-icons/fa";
+import { FaEdit, FaTrash } from "react-icons/fa";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import api from "@/service/api";
@@ -19,6 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { ArrowUpDown } from "@/assets/assets";
 
 const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -146,7 +147,7 @@ const CategoryPage = () => {
         await api.post("/products/categories/reorder", { order: payload });
         toast.success("Urutan kategori berhasil disimpan!");
       } catch (err) {
-        console.log(err)
+        console.log(err);
         toast.error("Gagal menyimpan urutan. Silakan refresh halaman.");
         // Optional: revert state jika gagal
         setCategories(categories);
@@ -212,7 +213,9 @@ const CategoryPage = () => {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[110] p-4">          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
+          {" "}
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="p-6">
               <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
                 {editMode ? "Edit Kategori" : "Tambah Kategori"}
@@ -327,7 +330,7 @@ const SortableCategoryItem = ({ cat, openEditModal, handleDelete }) => {
         {...listeners}
         className="cursor-grab p-2 text-gray-400 hover:text-gray-600"
       >
-        <FaGripVertical />
+        <ArrowUpDown />
       </div>
       <div className="flex-shrink-0 w-16 text-sm text-gray-500">
         {cat.category_id}
@@ -353,17 +356,17 @@ const SortableCategoryItem = ({ cat, openEditModal, handleDelete }) => {
       <div className="flex-shrink-0 w-24 text-right">
         <button
           onClick={() => openEditModal(cat)}
-          className="text-indigo-600 hover:text-indigo-900 mr-4"
+          className="text-blue-600 hover:text-blue-800 mr-4"
           aria-label="Edit"
         >
-          <FaPencilAlt />
+          <FaEdit size={16} />
         </button>
         <button
           onClick={() => handleDelete(cat.category_id)}
-          className="text-red-600 hover:text-red-900"
+          className="text-red-600 hover:text-red-800"
           aria-label="Delete"
         >
-          <FaTrashAlt />
+          <FaTrash size={16} />
         </button>
       </div>
     </div>

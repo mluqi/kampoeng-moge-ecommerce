@@ -101,7 +101,7 @@ export default function ProductFilterBar({
 
         {/* Category Dropdown */}
         {showCategoryDropdown && (
-          <div className="absolute z-10 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200">
+          <div className="absolute z-99 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200">
             {/* Search input */}
             <div className="p-2 border-b border-gray-200">
               <input

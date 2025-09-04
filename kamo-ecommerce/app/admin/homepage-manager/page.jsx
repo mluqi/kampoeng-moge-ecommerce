@@ -135,7 +135,7 @@ const HomepageManagerPage = () => {
     }));
 
     // Preview dengan aspect ratio
-    const aspectRatio = type === "desktop" ? "32/6" : "3/4";
+    const aspectRatio = type === "desktop" ? "640/127" : "3/4";
     createAspectRatioPreview(file, aspectRatio, (preview) => {
       setAspectRatioPreviews((prev) => ({
         ...prev,
@@ -324,7 +324,7 @@ const HomepageManagerPage = () => {
           className="mx-auto bg-gray-200 overflow-hidden relative"
           style={{
             width: "100%",
-            maxWidth: "300px",
+            maxWidth: "800px",
             aspectRatio: aspectRatio,
             backgroundImage: `url(${imageUrl})`,
             backgroundSize: "cover",
@@ -335,7 +335,7 @@ const HomepageManagerPage = () => {
           <div className="absolute inset-0 border border-dashed border-gray-400"></div>
         </div>
         <p className="text-xs text-gray-500 mt-2 text-center">
-          Preview area tampilan (ratio: {aspectRatio})
+          Preview area tampilan
         </p>
       </div>
     );
@@ -634,8 +634,8 @@ const HomepageManagerPage = () => {
                 "Gambar Desktop",
                 slideImagePreviews.desktop,
                 (e) => handleSlideImageChange(e, "desktop"),
-                "Rekomendasi ratio ukuran 32:6",
-                "32/6",
+                "Rekomendasi 2560 x 508",
+                "640/127",
                 aspectRatioPreviews.desktop
               )}
               {renderImageInput(
@@ -643,7 +643,7 @@ const HomepageManagerPage = () => {
                 "Gambar Mobile",
                 slideImagePreviews.mobile,
                 (e) => handleSlideImageChange(e, "mobile"),
-                "Rekomendasi ratio ukuran 3:4",
+                "Rekomendasi 768 x 1024",
                 "3/4",
                 aspectRatioPreviews.mobile
               )}

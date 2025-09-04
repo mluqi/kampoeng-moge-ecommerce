@@ -28,13 +28,38 @@ const ProductInfoCard = ({ product, onClick, className = "" }) => {
         <div className="font-semibold text-sm line-clamp-2">
           {product.product_name}
         </div>
-        <div className="text-accent font-bold text-base">
-          {product.product_price?.toLocaleString("id-ID", {
-            style: "currency",
-            currency: "IDR",
-            minimumFractionDigits: 0,
-          })}
-        </div>
+        {product.product_is_discount && product.product_discount_status ? (
+          <div>
+            <div className="flex items-center gap-1">
+            <p className="text-xs text-gray-500 line-through">
+              {product.product_price?.toLocaleString("id-ID", {
+                style: "currency",
+                currency: "IDR",
+                minimumFractionDigits: 0,
+              })}
+            </p>
+            <span className="text-xs text-white bg-[#F84B62] px-1 rounded mr-2">
+              {product.product_discount_percentage}%
+            </span>
+
+            </div>
+            <p className="text-[#F84B62] font-bold text-base">
+              {product.product_discount_price?.toLocaleString("id-ID", {
+                style: "currency",
+                currency: "IDR",
+                minimumFractionDigits: 0,
+              })}
+            </p>
+          </div>
+        ) : (
+          <div className="text-accent font-bold text-base">
+            {product.product_price?.toLocaleString("id-ID", {
+              style: "currency",
+              currency: "IDR",
+              minimumFractionDigits: 0,
+            })}
+          </div>
+        )}
         <button
           onClick={onClick}
           className="mt-1 text-xs text-white bg-accent px-3 py-1 rounded hover:bg-accent/90"

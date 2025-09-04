@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { assets } from "../assets/assets";
+import { assets, LabelDiskon } from "../assets/assets";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { useUserAuth } from "@/contexts/UserAuthContext";
@@ -98,9 +98,21 @@ const ProductCard = ({ product }) => {
       }`}
     >
       {/* Product Image */}
-      <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden mb-3">
+      <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden mb-3 group">
+        {/* Discount Badge */}
+        {product.product_is_discount && (
+          <div className="absolute top-0 left-0 z-10 text-white">
+            <div className="relative w-14 h-14">
+              <LabelDiskon className="text-[#F84B62]" />
+              <div className="absolute text-white inset-0 flex items-center justify-center text-xs font-bold transform -translate-y-2 -translate-x-1">
+                {product.product_discount_percentage}%
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Wishlist Button */}
-        <button
+        {/* <button
           onClick={handleWishlistClick}
           className="absolute top-2 left-2 z-1 p-2 bg-white rounded-full shadow-md"
           aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
@@ -110,7 +122,7 @@ const ProductCard = ({ product }) => {
               isWishlisted ? "text-red-500" : "text-gray-400 hover:text-red-500"
             }`}
           />
-        </button>
+        </button> */}
 
         <Image
           src={
@@ -142,7 +154,7 @@ const ProductCard = ({ product }) => {
         </h3>
 
         {/* Rating */}
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-1">
           {renderRatingStars(product.product_average_rating || 0)}
           <span className="text-xs text-gray-500">
             ({product.product_review_count || 0})
@@ -151,9 +163,26 @@ const ProductCard = ({ product }) => {
 
         {/* Price */}
         <div className="flex items-end justify-between mt-auto">
-          <p className="text-sm md:text-sm lg:text-lg font-bold text-gray-900">
-            Rp {product.product_price?.toLocaleString("id-ID")}
-          </p>
+          <div className="flex flex-col">
+            {product.product_is_discount ? (
+              <p className="text-xs text-gray-400 line-through">
+                Rp {product.product_price?.toLocaleString("id-ID")}
+              </p>
+            ) : (
+              <div className="h-4" /> // Placeholder untuk menjaga tinggi layout
+            )}
+            <p
+              className={`text-sm md:text-sm lg:text-lg font-bold ${
+                product.product_is_discount ? "text-[#F84B62]" : "text-gray-900"
+              }`}
+            >
+              Rp{" "}
+              {(product.product_is_discount
+                ? product.product_discount_price
+                : product.product_price
+              )?.toLocaleString("id-ID")}
+            </p>
+          </div>
 
           {/* Action Buttons */}
           <div className="flex gap-2">

@@ -1,8 +1,9 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/service/api";
 import { toast } from "react-hot-toast";
+import Loading from "@/components/Loading";
 
 const SettingsPage = () => {
   const { admin } = useAuth();
@@ -13,6 +14,8 @@ const SettingsPage = () => {
   });
   const [activeServices, setActiveServices] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const [categoryColor, setCategoryColor] = useState("#000000");
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -148,6 +151,49 @@ const SettingsPage = () => {
         </form>
       </div>
 
+      {/* Colour Setting */}
+      <div className="mt-12 max-w-lg bg-white p-6 rounded-lg shadow-sm">
+        <h2 className="text-xl font-semibold text-gray-700 mb-4">
+          Atur Warna Teks Kategori
+        </h2>
+        {/* ... deskripsi ... */}
+        <div className="space-y-4">
+          <div>
+            <label
+              htmlFor="category_colour"
+              className="block text-sm font-medium text-gray-600"
+            >
+              Pilih Warna
+            </label>
+            <div className="mt-1 flex items-center gap-4">
+              <input
+                type="color"
+                id="category_colour"
+                name="category_colour"
+                value={categoryColor}
+                onChange={(e) => setCategoryColor(e.target.value)}
+                className="h-10 w-16 p-1 border border-gray-300 rounded-md cursor-pointer"
+              />
+              <input
+                type="text"
+                value={categoryColor}
+                onChange={(e) => setCategoryColor(e.target.value)}
+                className="block w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-accent focus:border-accent sm:text-sm"
+              />
+            </div>
+          </div>
+          <div>
+            <button
+              onClick={handleUpdateColour} // <-- Di sini handle dihubungkan
+              disabled={loading}
+              className="py-2 px-4 bg-accent text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer hover:bg-accent/90"
+            >
+              {loading ? "Menyimpan..." : "Simpan Warna"}
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Shipping Service Settings */}
       <div className="mt-12 max-w-lg bg-white p-6 rounded-lg shadow-sm">
         <h2 className="text-xl font-semibold text-gray-700 mb-4">
@@ -222,6 +268,10 @@ const SettingsPage = () => {
   }
   async function handleUpdateServices() {
     await api.put("/settings/shipping-services", { services: activeServices });
+  }
+
+  async function handleUpdateColour() {
+    await api.put("/settings/category-colour", { colour: categoryColor });
   }
 };
 

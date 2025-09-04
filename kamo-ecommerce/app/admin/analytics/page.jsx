@@ -32,19 +32,20 @@ const PERIOD_OPTIONS = [
   { key: "30d", label: "30 Hari" },
 ];
 
+const SORT_OPTIONS = [
+  { key: "combined", label: "Skor Gabungan" },
+  { key: "views", label: "Paling Dilihat" },
+  { key: "carts", label: "Paling di Keranjang" },
+];
+
 const ProductAnalyticsPage = () => {
   const [period, setPeriod] = useState("24h");
-  const [activeTab, setActiveTab] = useState("views"); // "views" atau "carts"
-  const [topViewedProducts, setTopViewedProducts] = useState([]);
-  const [topCartProducts, setTopCartProducts] = useState([]);
-  const [viewChartData, setViewChartData] = useState([]);
-  const [cartChartData, setCartChartData] = useState([]);
-  const [currentViewPage, setCurrentViewPage] = useState(1);
-  const [currentCartPage, setCurrentCartPage] = useState(1);
-  const [totalViewPages, setTotalViewPages] = useState(1);
-  const [totalCartPages, setTotalCartPages] = useState(1);
+  const [sortType, setSortType] = useState("combined");
+  const [topProducts, setTopProducts] = useState([]);
+  const [chartData, setChartData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [loadingChart, setLoadingChart] = useState(true);
   const [customStartDate, setCustomStartDate] = useState(null);
   const [customEndDate, setCustomEndDate] = useState(null);
   const [expandedProduct, setExpandedProduct] = useState({
@@ -56,118 +57,64 @@ const ProductAnalyticsPage = () => {
 
   const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-  const fetchChartData = useCallback(
-    async (currentPeriod) => {
-      setLoadingChart(true);
-      const params = {
-        limit: 5,
-        page: 1,
-      };
+  const fetchAnalyticsData = useCallback(async () => {
+    setLoading(true);
+    const baseParams = {};
+    if (period === "custom" && customStartDate && customEndDate) {
+      baseParams.startDate = customStartDate.toISOString();
+      baseParams.endDate = customEndDate.toISOString();
+    } else {
+      baseParams.period = period;
+    }
 
-      if (currentPeriod === "custom" && customStartDate && customEndDate) {
-        params.startDate = customStartDate.toISOString();
-        params.endDate = customEndDate.toISOString();
-      } else {
-        params.period = currentPeriod;
-      }
+    try {
+      // Fetch data for the main table
+      const tablePromise = api.get("/analytics/top-products", {
+        params: { ...baseParams, limit: 10, page: currentPage, sort: sortType },
+      });
 
-      try {
-        // Fetch data untuk chart views
-        const viewResponse = await api.get("/analytics/top-products", {
-          params: { ...params, sort: "views" },
-        });
+      // Fetch data for the chart (always top 5 combined)
+      const chartPromise = api.get("/analytics/top-products", {
+        params: { ...baseParams, limit: 5, page: 1, sort: "combined" },
+      });
 
-        // Fetch data untuk chart carts
-        const cartResponse = await api.get("/analytics/top-products", {
-          params: { ...params, sort: "carts" },
-        });
+      const [tableResponse, chartResponse] = await Promise.all([
+        tablePromise,
+        chartPromise,
+      ]);
 
-        const formatName = (p) =>
-          p.product_name.substring(0, 15) +
-          (p.product_name.length > 15 ? "..." : "");
+      // Process table data
+      setTopProducts(tableResponse.data.data);
+      setTotalPages(tableResponse.data.totalPages);
+      setCurrentPage(tableResponse.data.currentPage);
 
-        const viewsData = viewResponse.data.data.map((p) => ({
-          name: formatName(p),
-          Dilihat: p.view_count,
-        }));
-
-        const cartsData = cartResponse.data.data.map((p) => ({
-          name: formatName(p),
-          Keranjang: p.cart_add_count,
-        }));
-
-        setViewChartData(viewsData);
-        setCartChartData(cartsData);
-      } catch (error) {
-        console.error("Gagal mengambil data chart:", error);
-      } finally {
-        setLoadingChart(false);
-      }
-    },
-    [customStartDate, customEndDate]
-  );
-
-  const fetchTopProducts = useCallback(
-    async (currentPeriod, sortType, page) => {
-      setLoading(true);
-      const params = {
-        limit: 10,
-        page: page,
-        sort: sortType, // "views" atau "carts"
-      };
-
-      if (currentPeriod === "custom" && customStartDate && customEndDate) {
-        params.startDate = customStartDate.toISOString();
-        params.endDate = customEndDate.toISOString();
-      } else {
-        params.period = currentPeriod;
-      }
-
-      try {
-        const response = await api.get("/analytics/top-products", {
-          params,
-        });
-
-        if (sortType === "views") {
-          setTopViewedProducts(response.data.data);
-          setTotalViewPages(response.data.totalPages);
-          setCurrentViewPage(response.data.currentPage);
-        } else {
-          setTopCartProducts(response.data.data);
-          setTotalCartPages(response.data.totalPages);
-          setCurrentCartPage(response.data.currentPage);
-        }
-      } catch (error) {
-        console.error("Gagal mengambil data analitik:", error);
-        if (sortType === "views") {
-          setTopViewedProducts([]);
-          setTotalViewPages(1);
-        } else {
-          setTopCartProducts([]);
-          setTotalCartPages(1);
-        }
-      } finally {
-        setLoading(false);
-      }
-    },
-    [customStartDate, customEndDate]
-  );
+      // Process chart data
+      const formatName = (p) =>
+        p.product_name.substring(0, 15) +
+        (p.product_name.length > 15 ? "..." : "");
+      const formattedChartData = chartResponse.data.data.map((p) => ({
+        name: formatName(p),
+        Dilihat: p.view_count,
+        Keranjang: p.cart_add_count,
+      }));
+      setChartData(formattedChartData);
+    } catch (error) {
+      console.error("Gagal mengambil data analitik:", error);
+      setTopProducts([]);
+      setChartData([]);
+      setTotalPages(1);
+    } finally {
+      setLoading(false);
+    }
+  }, [period, customStartDate, customEndDate, currentPage, sortType]);
 
   useEffect(() => {
-    // Fetch data untuk kedua tabel
-    fetchTopProducts(period, "views", currentViewPage);
-    fetchTopProducts(period, "carts", currentCartPage);
-  }, [period, currentViewPage, currentCartPage, fetchTopProducts]);
+    fetchAnalyticsData();
+  }, [fetchAnalyticsData]);
 
-  useEffect(() => {
-    fetchChartData(period);
-  }, [period, fetchChartData]);
-
-  const handlePageChange = (newPage, type) => {
-    if (type === "views" && newPage >= 1 && newPage <= totalViewPages) {
-      setCurrentViewPage(newPage);
-    } else if (type === "carts" && newPage >= 1 && newPage <= totalCartPages) {
-      setCurrentCartPage(newPage);
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
     }
   };
 
@@ -208,26 +155,17 @@ const ProductAnalyticsPage = () => {
   const handleApplyCustomDate = () => {
     if (customStartDate && customEndDate) {
       setPeriod("custom");
-      setCurrentViewPage(1);
-      setCurrentCartPage(1);
+      setCurrentPage(1);
     }
   };
 
-  const renderProductTable = (products, type, currentPage, totalPages) => {
-    const isViews = type === "views";
-    const iconComponent = isViews ? <FaEye /> : <FaShoppingCart />;
-    const iconColor = isViews ? "text-accent" : "text-emerald-500";
-    const countKey = isViews ? "view_count" : "cart_add_count";
-    const title = isViews
-      ? "Produk Paling Sering Dilihat"
-      : "Produk Paling Sering Ditambah ke Keranjang";
-
+  const renderProductTable = (products) => {
     return (
       <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
         <div className="bg-gray-50 px-4 py-3 border-b">
           <h3 className="text-xs font-semibold text-gray-700 flex items-center gap-2">
-            <span className={iconColor}>{iconComponent}</span>
-            {title}
+            <FaChartLine className="text-gray-500" />
+            Peringkat Produk
           </h3>
         </div>
 
@@ -267,24 +205,32 @@ const ProductAnalyticsPage = () => {
                         {product.product_id} || {product.product_sku}
                       </p>
                     </div>
-                    <button
-                      onClick={() =>
-                        handleAccordionToggle(product.product_id, type)
-                      }
-                      className={`flex items-center gap-2 text-sm font-bold ${iconColor} transition-transform hover:scale-110 cursor-pointer`}
-                      title={
-                        isViews
-                          ? "Lihat detail pengunjung"
-                          : "Lihat siapa yang menambahkan ke keranjang"
-                      }
-                    >
-                      {iconComponent}
-                      <span>{product[countKey]}</span>
-                    </button>
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() =>
+                          handleAccordionToggle(product.product_id, "views")
+                        }
+                        className="flex items-center gap-2 text-sm font-bold text-accent transition-transform hover:scale-110 cursor-pointer"
+                        title="Lihat detail pengunjung"
+                      >
+                        <FaEye />
+                        <span>{product.view_count}</span>
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleAccordionToggle(product.product_id, "carts")
+                        }
+                        className="flex items-center gap-2 text-sm font-bold text-emerald-500 transition-transform hover:scale-110 cursor-pointer"
+                        title="Lihat siapa yang menambahkan ke keranjang"
+                      >
+                        <FaShoppingCart />
+                        <span>{product.cart_add_count}</span>
+                      </button>
+                    </div>
                   </div>
                   {/* Accordion Content */}
                   {expandedProduct.id === product.product_id &&
-                    expandedProduct.type === type && (
+                    expandedProduct.type && (
                       <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
                         {accordionLoading ? (
                           <div className="flex justify-center items-center h-24">
@@ -293,7 +239,7 @@ const ProductAnalyticsPage = () => {
                         ) : accordionData.length > 0 ? (
                           <div className="max-h-60 overflow-y-auto">
                             <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                              {type === "views"
+                              {expandedProduct.type === "views"
                                 ? "Daftar Pengunjung"
                                 : "Ditambahkan ke Keranjang oleh"}
                             </h4>
@@ -313,7 +259,7 @@ const ProductAnalyticsPage = () => {
                                     </p>
                                   </div>
                                   <div className="text-right">
-                                    {type === "carts" && (
+                                    {expandedProduct.type === "carts" && (
                                       <p className="text-xs text-gray-600">
                                         Jumlah:{" "}
                                         <span className="font-bold">
@@ -323,7 +269,7 @@ const ProductAnalyticsPage = () => {
                                     )}
                                     <p className="text-xs text-gray-400">
                                       {new Date(
-                                        item.viewed_at || item.createdAt
+                                        item.viewed_at || item.updateAt
                                       ).toLocaleString("id-ID", {
                                         day: "2-digit",
                                         month: "short",
@@ -355,7 +301,7 @@ const ProductAnalyticsPage = () => {
             {totalPages > 1 && (
               <div className="flex justify-center items-center p-4 border-t bg-gray-50 gap-4">
                 <button
-                  onClick={() => handlePageChange(currentPage - 1, type)}
+                  onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
                   className="flex items-center gap-2 px-3 py-1 text-sm font-medium text-gray-600 bg-white border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -366,7 +312,7 @@ const ProductAnalyticsPage = () => {
                   Halaman {currentPage} dari {totalPages}
                 </span>
                 <button
-                  onClick={() => handlePageChange(currentPage + 1, type)}
+                  onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
                   className="flex items-center gap-2 px-3 py-1 text-sm font-medium text-gray-600 bg-white border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -378,12 +324,11 @@ const ProductAnalyticsPage = () => {
           </>
         ) : (
           <div className="text-center py-16">
-            <div className={`mx-auto text-4xl text-gray-300 mb-4 ${iconColor}`}>
-              {iconComponent}
+            <div className="mx-auto text-4xl text-gray-300 mb-4">
+              <FaChartLine />
             </div>
             <p className="text-gray-500">
-              Tidak ada data produk untuk kategori ini pada periode yang
-              dipilih.
+              Tidak ada data produk untuk periode yang dipilih.
             </p>
           </div>
         )}
@@ -410,8 +355,7 @@ const ProductAnalyticsPage = () => {
                 setPeriod(option.key);
                 setCustomStartDate(null);
                 setCustomEndDate(null);
-                setCurrentViewPage(1);
-                setCurrentCartPage(1);
+                setCurrentPage(1);
               }}
               className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
                 period === option.key
@@ -459,155 +403,88 @@ const ProductAnalyticsPage = () => {
         </div>
       </div>
 
-      {/* Chart Section */}
-      {loadingChart ? (
-        <div className="mb-8 flex h-[350px] items-center justify-center rounded-lg border bg-white p-4 shadow-sm">
+      {/* Chart & Table Section */}
+      {loading ? (
+        <div className="flex h-[400px] items-center justify-center">
           <Loading />
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Chart Dilihat */}
-          <div className="bg-white p-4 rounded-lg shadow-sm border">
+        <>
+          {/* Chart Section */}
+          <div className="bg-white p-4 rounded-lg shadow-sm border mb-8">
             <h2 className="text-lg font-semibold text-gray-700 mb-4">
-              Top 5 Produk Dilihat
+              Top 5 Produk Berdasarkan Skor Gabungan
             </h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart
-                data={viewChartData}
-                margin={{ top: 5, right: 20, left: -10, bottom: 5 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="#f0f0f0"
-                />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                <Tooltip
-                  cursor={{ fill: "rgba(249, 174, 24, 0.1)" }}
-                  contentStyle={{
-                    background: "#ffffff",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "0.375rem",
-                  }}
-                />
-                <Bar
-                  dataKey="Dilihat"
-                  fill="#F9AE18"
-                  radius={[4, 4, 0, 0]}
-                  animationDuration={1500}
-                  barSize={40}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Chart Keranjang */}
-          <div className="bg-white p-4 rounded-lg shadow-sm border">
-            <h2 className="text-lg font-semibold text-gray-700 mb-4">
-              Top 5 Produk Ditambahkan ke Keranjang
-            </h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart
-                data={cartChartData}
-                margin={{ top: 5, right: 20, left: -10, bottom: 5 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="#f0f0f0"
-                />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                <Tooltip
-                  cursor={{ fill: "rgba(16, 185, 129, 0.1)" }}
-                  contentStyle={{
-                    background: "#ffffff",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "0.375rem",
-                  }}
-                />
-                <Bar
-                  dataKey="Keranjang"
-                  fill="#10B981"
-                  radius={[4, 4, 0, 0]}
-                  animationDuration={1500}
-                  barSize={40}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Tab Navigation - Only show on mobile */}
-      <div className="mb-6 lg:hidden">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => setActiveTab("views")}
-              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === "views"
-                  ? "border-accent text-accent"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <div className="flex items-center gap-2 text-xs">
-                <FaEye />
-                Produk Paling Sering Dilihat
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 5, right: 20, left: -10, bottom: 5 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="#f0f0f0"
+                  />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    cursor={{ fill: "rgba(200, 200, 200, 0.1)" }}
+                    contentStyle={{
+                      background: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "0.375rem",
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: "12px" }} />
+                  <Bar
+                    dataKey="Dilihat"
+                    fill="#F9AE18"
+                    radius={[4, 4, 0, 0]}
+                    animationDuration={1500}
+                  />
+                  <Bar
+                    dataKey="Keranjang"
+                    fill="#10B981"
+                    radius={[4, 4, 0, 0]}
+                    animationDuration={1500}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-center py-16 text-gray-500">
+                Tidak ada data untuk ditampilkan di chart.
               </div>
-            </button>
-            <button
-              onClick={() => setActiveTab("carts")}
-              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === "carts"
-                  ? "border-emerald-500 text-emerald-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <div className="flex items-center gap-2 text-xs">
-                <FaShoppingCart />
-                Produk Paling Sering Ditambah ke Keranjang
-              </div>
-            </button>
-          </nav>
-        </div>
-      </div>
-
-      {/* Tables Section */}
-      {loading ? (
-        <Loading />
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Table Views */}
-          <div
-            className={`${activeTab === "views" ? "block" : "hidden"} lg:block`}
-          >
-            {renderProductTable(
-              topViewedProducts,
-              "views",
-              currentViewPage,
-              totalViewPages
             )}
           </div>
 
-          {/* Table Carts */}
-          <div
-            className={`${activeTab === "carts" ? "block" : "hidden"} lg:block`}
-          >
-            {renderProductTable(
-              topCartProducts,
-              "carts",
-              currentCartPage,
-              totalCartPages
-            )}
+          {/* Sort and Table Section */}
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-sm font-medium text-gray-600">Urutkan:</span>
+            {SORT_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                onClick={() => {
+                  setSortType(option.key);
+                  setCurrentPage(1);
+                }}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                  sortType === option.key
+                    ? "bg-accent text-white shadow-sm"
+                    : "bg-white text-gray-600 hover:bg-gray-100 border"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
-        </div>
+
+          {renderProductTable(topProducts)}
+        </>
       )}
 
       {/* Footer Note */}
-      {((activeTab === "views" && topViewedProducts.length > 0) ||
-        (activeTab === "carts" && topCartProducts.length > 0)) && (
+      {!loading && topProducts.length > 0 && (
         <div className="mt-6 text-xs text-gray-500 text-center">
           * Data berdasarkan interaksi pengguna dalam periode yang dipilih
         </div>

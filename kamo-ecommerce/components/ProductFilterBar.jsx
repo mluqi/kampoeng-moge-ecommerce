@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import api from "@/service/api";
 
 const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -25,27 +26,46 @@ export default function ProductFilterBar({
   const containerRef = useRef(null);
   const [xPos, setXPos] = useState(0);
 
-  const allSlides = useMemo(() => [
-    ...categories.map((cat) => ({
-      id: cat.category_id,
-      type: "category",
-      label: cat.category_name,
-      image: cat.category_image
-        ? baseUrl + cat.category_image
-        : "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=800&q=80",
-    })),
-    {
-      id: "other",
-      type: "other",
-      label: "Other",
-      image:
-        "https://images.unsplash.com/photo-1511556820780-d912e42b4980?auto=format&fit=crop&w=800&q=80",
-    },
-  ], [categories]);
+  const [categoryColor, setCategoryColor] = useState("#000000"); // Default color
+  const allSlides = useMemo(
+    () => [
+      ...categories.map((cat) => ({
+        id: cat.category_id,
+        type: "category",
+        label: cat.category_name,
+        image: cat.category_image
+          ? baseUrl + cat.category_image
+          : "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=800&q=80",
+      })),
+      {
+        id: "other",
+        type: "other",
+        label: "Other",
+        image:
+          "https://images.unsplash.com/photo-1511556820780-d912e42b4980?auto=format&fit=crop&w=800&q=80",
+      },
+    ],
+    [categories]
+  );
 
   const infiniteSlides = [...allSlides, ...allSlides, ...allSlides];
   const slideWidth = 128 + 12;
   const totalWidth = allSlides.length * slideWidth;
+
+  // Fetch settings for custom colors
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await api.get("/settings/category_colour"); // This endpoint returns { key, value, ... }
+        if (res.data && res.data.value) {
+          setCategoryColor(res.data.value); // Set only the color code
+        }
+      } catch (error) {
+        console.error("Failed to fetch settings for filter bar:", error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   // Animasi custom
   useEffect(() => {
@@ -80,7 +100,10 @@ export default function ProductFilterBar({
       : 300;
 
     setXPos((prev) => {
-      return Math.min(0, prev + (direction === "left" ? scrollAmount : -scrollAmount));
+      return Math.min(
+        0,
+        prev + (direction === "left" ? scrollAmount : -scrollAmount)
+      );
     });
   };
 
@@ -126,7 +149,7 @@ export default function ProductFilterBar({
                 key={`${slide.id}-${index}`}
                 onClick={() => handleSlideClick(slide)}
                 className={`relative h-32 w-32 rounded-lg overflow-hidden transition-all cursor-pointer
-                flex items-end p-3 bg-cover bg-center flex-shrink-0
+                flex items-end bg-cover bg-center flex-shrink-0
                 ${isSelected(slide) ? "ring-2 ring-accent ring-offset-2" : ""}`}
                 style={{
                   backgroundImage: `url('${slide.image}')`,
@@ -134,7 +157,10 @@ export default function ProductFilterBar({
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <span className="text-white font-medium text-sm drop-shadow-md">
+                <span
+                  className="font-medium text-sm drop-shadow-md mb-1 ml-3"
+                  style={{ color: categoryColor }}
+                >
                   {slide.label}
                 </span>
               </motion.button>

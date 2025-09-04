@@ -3,8 +3,12 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import api from "@/service/api";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Pagination, Autoplay } from "swiper/modules";
 
-const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+// Import Swiper styles
+import "swiper/css";
+import "swiper/css/pagination";
 
 interface Slide {
   id: number;
@@ -13,10 +17,11 @@ interface Slide {
   image_url_mobile: string;
 }
 
+const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
 const HeaderSlider = () => {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
     const fetchSlides = async () => {
@@ -32,18 +37,6 @@ const HeaderSlider = () => {
     fetchSlides();
   }, []);
 
-  useEffect(() => {
-    if (slides.length === 0) return;
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % slides.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [slides.length]);
-
-  const handleSlideChange = (index: React.SetStateAction<number>) => {
-    setCurrentSlide(index);
-  };
-
   if (loading) {
     return (
       <div className="bg-gray-200 animate-pulse mt-6 rounded-xl w-full aspect-[32/9] md:aspect-[32/9]"></div>
@@ -55,31 +48,38 @@ const HeaderSlider = () => {
   }
 
   return (
-    <div className="overflow-hidden relative w-full">
-      <div
-        className="flex transition-transform duration-700 ease-in-out"
-        style={{
-          transform: `translateX(-${currentSlide * 100}%)`,
+    <div className="relative w-full">
+      <Swiper
+        modules={[Pagination, Autoplay]}
+        loop={true}
+        autoplay={{
+          delay: 3000,
+          disableOnInteraction: false,
         }}
+        pagination={{
+          clickable: true,
+          el: ".swiper-pagination-custom",
+        }}
+        className="mt-6 rounded-xl overflow-hidden"
       >
         {slides.map((slide, index) => (
-          <div key={slide.id} className="min-w-full mt-6 flex-shrink-0">
+          <SwiperSlide key={slide.id}>
             <Link
               href={slide.link || "/"}
-              className="block relative mt-6 rounded-xl min-w-full overflow-hidden group"
+              className="block relative overflow-hidden group"
             >
               {/* Container untuk Desktop (32:6) */}
-              <div className="hidden md:block relative w-full aspect-[32/6]">
+              <div className="hidden md:block relative w-full aspect-[640/127]">
                 <Image
                   src={baseUrl + slide.image_url_desktop}
                   alt={`Slide Desktop ${index + 1}`}
                   fill
                   priority={index === 0}
-                  className="object-cover transition-transform duration-300"
+                  className="object-cover"
                   sizes="(max-width: 768px) 100vw, 1424px"
                 />
               </div>
-              
+
               {/* Container untuk Mobile (3:4) */}
               <div className="block md:hidden relative w-full aspect-[3/4]">
                 <Image
@@ -87,26 +87,31 @@ const HeaderSlider = () => {
                   alt={`Slide Mobile ${index + 1}`}
                   fill
                   priority={index === 0}
-                  className="object-cover transition-transform duration-300"
+                  className="object-cover"
                   sizes="(min-width: 769px) 100vw, 315px"
                 />
               </div>
             </Link>
-          </div>
+          </SwiperSlide>
         ))}
-      </div>
-
-      <div className="flex items-center justify-center gap-2 mt-8">
-        {slides.map((_, index) => (
-          <div
-            key={index}
-            onClick={() => handleSlideChange(index)}
-            className={`h-2 w-2 mb-2 rounded-full cursor-pointer transition-all duration-300 ${
-              currentSlide === index ? "bg-accent scale-125" : "bg-gray-500/30 hover:bg-gray-500/50"
-            }`}
-          ></div>
-        ))}
-      </div>
+      </Swiper>
+      <div className="swiper-pagination-custom flex items-center justify-center gap-2 mt-8"></div>
+      <style jsx global>{`
+        .swiper-pagination-custom .swiper-pagination-bullet {
+          width: 8px;
+          height: 8px;
+          background-color: rgba(107, 114, 128, 0.3); /* bg-gray-500/30 */
+          opacity: 1;
+          transition: all 0.3s;
+        }
+        .swiper-pagination-custom .swiper-pagination-bullet-active {
+          background-color: #004526; /* bg-accent */
+          transform: scale(1.25);
+        }
+        .swiper-pagination-custom .swiper-pagination-bullet:hover {
+          background-color: rgba(107, 114, 128, 0.5); /* hover:bg-gray-500/50 */
+        }
+      `}</style>
     </div>
   );
 };

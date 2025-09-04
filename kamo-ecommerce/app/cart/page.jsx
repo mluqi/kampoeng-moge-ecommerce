@@ -39,7 +39,7 @@ const Cart = () => {
     [selectedCartTotal]
   );
 
-  if(!user) {
+  if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -112,94 +112,133 @@ const Cart = () => {
                         isOutOfStock ? "bg-red-50 opacity-70" : ""
                       }`}
                     >
-                    <input
-                      type="checkbox"
-                      checked={selectedItems.includes(item.product_id)}
-                      onChange={() => toggleSelectItem(item.product_id)}
-                      disabled={isOutOfStock}
-                      className="flex-shrink-0 mt-1 sm:mt-0 h-5 w-5 rounded border-gray-300 text-accent focus:ring-accent cursor-pointer disabled:cursor-not-allowed disabled:bg-gray-200"
-                    />
-                    <div className="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24">
-                      <Image
-                        src={
-                          item.product.product_pictures?.[0]
-                            ? baseUrl + item.product.product_pictures[0]
-                            : assets.product_placeholder
-                        }
-                        alt={item.product.product_name}
-                        width={96}
-                        height={96}
-                        className="w-full h-full rounded-md object-cover bg-gray-100"
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.includes(item.product_id)}
+                        onChange={() => toggleSelectItem(item.product_id)}
+                        disabled={isOutOfStock}
+                        className="flex-shrink-0 mt-1 sm:mt-0 h-5 w-5 rounded border-gray-300 text-accent focus:ring-accent cursor-pointer disabled:cursor-not-allowed disabled:bg-gray-200"
                       />
-                    </div>
+                      <div className="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24">
+                        <Image
+                          src={
+                            item.product.product_pictures?.[0]
+                              ? baseUrl + item.product.product_pictures[0]
+                              : assets.product_placeholder
+                          }
+                          alt={item.product.product_name}
+                          width={96}
+                          height={96}
+                          className="w-full h-full rounded-md object-cover bg-gray-100"
+                        />
+                      </div>
 
-                    {/* Details and Actions */}
-                    <div className="flex-grow flex flex-col justify-between w-full">
-                      {/* Top: Name, Price, and Mobile Remove Button */}
-                      <div className="flex justify-between items-start">
-                        <div className="pr-4">
-                          <p className="font-medium text-gray-800 line-clamp-2">
-                            {item.product.product_name}
-                          </p>
-                          {isOutOfStock && (
-                            <p className="text-xs font-bold text-red-600 mt-1">
-                              Stok Habis
+                      {/* Details and Actions */}
+                      <div className="flex-grow flex flex-col justify-between w-full">
+                        {/* Top: Name, Price, and Mobile Remove Button */}
+                        <div className="flex justify-between items-start">
+                          <div className="pr-4">
+                            <p
+                              className="font-medium text-gray-800 line-clamp-2 cursor-pointer"
+                              onClick={() => router.push(`/product/${item.product.product_id}`)}>
+                              {item.product.product_name}
                             </p>
-                          )}
-                          <p className="text-sm text-gray-500 mt-1">
+                            {isOutOfStock && (
+                              <p className="text-xs font-bold text-red-600 mt-1">
+                                Stok Habis
+                              </p>
+                            )}
+                            <div className="flex flex-col items-start mt-1">
+                              <div className="flex items-center gap-2">
+                                {item.product.product_is_discount && (
+                                  <p className="text-xs text-gray-400 line-through">
+                                    Rp{" "}
+                                    {item.product.product_price.toLocaleString(
+                                      "id-ID"
+                                    )}
+                                  </p>
+                                )}
+                                {item.product.product_is_discount && (
+                                  <p className="text-xs text-[#F84B62] font-medium bg-[#F84B62]/10 px-2 py-0.5 rounded-lg mt-1">
+                                    {item.product.product_discount_percentage}%
+                                  </p>
+                                )}
+                              </div>
+                              <p
+                                className={`text-sm font-semibold ${
+                                  item.product.product_is_discount
+                                    ? "text-[#F84B62]"
+                                    : "text-gray-800"
+                                }`}
+                              >
+                                Rp{" "}
+                                {item.product.product_is_discount
+                                  ? item.product.product_discount_price.toLocaleString(
+                                      "id-ID"
+                                    )
+                                  : item.product.product_price.toLocaleString(
+                                      "id-ID"
+                                    )}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => removeFromCart(item.product_id)}
+                            className="sm:hidden text-gray-400 hover:text-red-600 transition"
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
+
+                        {/* Bottom: Quantity and Subtotal */}
+                        <div className="flex flex-col items-start gap-2 mt-4 sm:flex-row sm:justify-between sm:items-center">
+                          <div className="flex items-center gap-3 border rounded-full px-2 py-1 self-start">
+                            <button
+                              onClick={() =>
+                                updateCartItem(
+                                  item.product_id,
+                                  item.quantity - 1
+                                )
+                              }
+                              disabled={isOutOfStock}
+                              className="text-gray-500 hover:text-red-500 font-semibold disabled:cursor-not-allowed disabled:text-gray-300"
+                            >
+                              -
+                            </button>
+                            <span className="font-medium text-sm w-5 text-center">
+                              {item.quantity}
+                            </span>
+                            <button
+                              onClick={() =>
+                                updateCartItem(
+                                  item.product_id,
+                                  item.quantity + 1
+                                )
+                              }
+                              disabled={isOutOfStock}
+                              className="text-gray-500 hover:text-green-500 font-semibold disabled:cursor-not-allowed disabled:text-gray-300"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <p className="font-semibold text-sm text-gray-800 w-full text-right sm:w-auto sm:text-left">
                             Rp{" "}
-                            {item.product.product_price.toLocaleString("id-ID")}
+                            {(
+                              (item.product.product_is_discount
+                                ? item.product.product_discount_price
+                                : item.product.product_price) * item.quantity
+                            ).toLocaleString("id-ID")}
                           </p>
                         </div>
-                        <button
-                          onClick={() => removeFromCart(item.product_id)}
-                          className="sm:hidden text-gray-400 hover:text-red-600 transition"
-                        >
-                          <FaTrash />
-                        </button>
                       </div>
-
-                      {/* Bottom: Quantity and Subtotal */}
-                      <div className="flex flex-col items-start gap-2 mt-4 sm:flex-row sm:justify-between sm:items-center">
-                        <div className="flex items-center gap-3 border rounded-full px-2 py-1 self-start">
-                          <button
-                            onClick={() =>
-                              updateCartItem(item.product_id, item.quantity - 1)
-                            }
-                            disabled={isOutOfStock}
-                            className="text-gray-500 hover:text-red-500 font-semibold disabled:cursor-not-allowed disabled:text-gray-300"
-                          >
-                            -
-                          </button>
-                          <span className="font-medium text-sm w-5 text-center">
-                            {item.quantity}
-                          </span>
-                          <button
-                            onClick={() =>
-                              updateCartItem(item.product_id, item.quantity + 1)
-                            }
-                            disabled={isOutOfStock}
-                            className="text-gray-500 hover:text-green-500 font-semibold disabled:cursor-not-allowed disabled:text-gray-300"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <p className="font-semibold text-sm text-gray-800 w-full text-right sm:w-auto sm:text-left">
-                          Rp{" "}
-                          {(
-                            item.product.product_price * item.quantity
-                          ).toLocaleString("id-ID")}
-                        </p>
-                      </div>
+                      {/* Desktop Remove Button */}
+                      <button
+                        onClick={() => removeFromCart(item.product_id)}
+                        className="hidden sm:block text-gray-400 hover:text-red-600 transition self-start"
+                      >
+                        <FaTrash />
+                      </button>
                     </div>
-                    {/* Desktop Remove Button */}
-                    <button
-                      onClick={() => removeFromCart(item.product_id)}
-                      className="hidden sm:block text-gray-400 hover:text-red-600 transition self-start"
-                    >
-                      <FaTrash />
-                    </button>
-                  </div>
                   );
                 })}
               </div>
@@ -225,7 +264,7 @@ const Cart = () => {
                   className="w-full mt-6 bg-accent text-white py-3 rounded-md hover:bg-accent/90 transition font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
                   onClick={() => router.push("/checkout")}
                 >
-                  Lanjut ke Checkout ({selectedItems.length})
+                  Beli ({selectedItems.length})
                 </button>
               </div>
             </div>

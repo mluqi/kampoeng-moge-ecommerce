@@ -1,13 +1,27 @@
 "use client";
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { assets } from "@/assets/assets";
-import Image from "next/image";
 import { useProduct } from "@/contexts/ProductContext";
 import { useCategory } from "@/contexts/CategoryContext";
 import toast from "react-hot-toast";
 import ProductTiktokSection from "@/components/admin/ProductTiktokSection"; // 1. Impor komponen TikTok
 import dynamic from "next/dynamic";
 import "react-quill-new/dist/quill.snow.css"; // Import CSS untuk editor
+import Image from "next/image";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { SortableImageItem } from "@/components/admin/SortableImageItem";
 
 // Import ReactQuill secara dinamis untuk menghindari masalah SSR
 const ReactQuill = dynamic(() => import("react-quill-new"), {
@@ -19,12 +33,12 @@ const AddProduct = () => {
   // Preserved all context hooks and state management
   const { addProduct } = useProduct();
   const { categories, fetchCategories } = useCategory();
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
 
-  const [files, setFiles] = useState([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [sku, setSku] = useState("");
@@ -44,6 +58,10 @@ const AddProduct = () => {
   const [annotations, setAnnotations] = useState("");
   const [brand, setBrand] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // State untuk gambar dengan ID unik untuk dnd-kit
+  const [files, setFiles] = useState([]);
+  const [activeId, setActiveId] = useState(null);
 
   // 2. Tambahkan state untuk menampung data spesifik dari TikTok
   const [categoryKeyword, setCategoryKeyword] = useState("");
@@ -122,6 +140,40 @@ const AddProduct = () => {
     "link",
     "image",
   ];
+
+  // Dnd-kit sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragStart = (event) => {
+    setActiveId(event.active.id);
+  };
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      setFiles((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+
+    setActiveId(null);
+  };
+
+  const handleFileSelect = (selectedFiles) => {
+    const newFiles = Array.from(selectedFiles).map((file) => ({
+      id: `${file.name}-${file.lastModified}`, // ID unik
+      file,
+    }));
+    setFiles((prev) => [...prev, ...newFiles].slice(0, 9)); // Batasi hingga 9 gambar
+  };
 
   // Preserved the handleSubmit function with added loading state
   const handleSubmit = async (e) => {
@@ -214,10 +266,8 @@ const AddProduct = () => {
         formData.append("categoryKeyword", categoryKeyword);
       }
 
-      files.forEach((file) => {
-        if (file) formData.append("pictures", file);
-      });
-
+      // Kirim file yang sudah diurutkan
+      files.forEach((item) => formData.append("pictures", item.file));
       const success = await addProduct(formData);
       if (success) {
         toast.success("Produk berhasil ditambahkan!");
@@ -251,6 +301,20 @@ const AddProduct = () => {
     }
   };
 
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileSelect(e.dataTransfer.files);
+      e.dataTransfer.clearData();
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-8xl mx-auto bg-white rounded-lg shadow-sm p-6">
@@ -262,64 +326,52 @@ const AddProduct = () => {
           {/* Image Upload Section */}
           <div>
             <h2 className="text-lg font-medium text-gray-700 mb-3">
-              Gambar Produk
+              Gambar Produk (Maks. 9, bisa diurutkan)
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {[...Array(5)].map((_, index) => (
-                <div key={index} className="flex flex-col items-center">
-                  <label
-                    htmlFor={`image${index}`}
-                    className="w-full h-44 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-accent transition-colors"
-                  >
-                    {files[index] ? (
-                      <Image
-                        src={URL.createObjectURL(files[index])}
-                        alt="Preview"
-                        width={200}
-                        height={200}
-                        className="w-full h-full object-cover rounded-lg"
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg"
+            >
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext items={files.map((f) => f.id)}>
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-4">
+                    {files.map((item, index) => (
+                      <SortableImageItem
+                        key={item.id}
+                        id={item.id}
+                        src={URL.createObjectURL(item.file)}
+                        onRemove={() =>
+                          setFiles((prev) =>
+                            prev.filter((f) => f.id !== item.id)
+                          )
+                        }
                       />
-                    ) : (
-                      <div className="text-center p-4">
+                    ))}
+                    {files.length < 9 && (
+                      <div
+                        onClick={() => fileInputRef.current.click()}
+                        className="w-full aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-accent transition-colors text-gray-500 hover:text-accent"
+                      >
                         <Image
                           src={assets.upload_area}
                           alt="Upload"
-                          width={48}
-                          height={48}
-                          className="mx-auto opacity-60"
+                          width={40}
+                          height={40}
+                          className="opacity-60"
                         />
-                        <p className="text-xs text-gray-500 mt-2">
-                          Upload Gambar
-                        </p>
+                        <p className="text-xs mt-2">Tambah Gambar</p>
                       </div>
                     )}
-                    <input
-                      onChange={(e) => {
-                        const updatedFiles = [...files];
-                        updatedFiles[index] = e.target.files[0];
-                        setFiles(updatedFiles);
-                      }}
-                      type="file"
-                      id={`image${index}`}
-                      hidden
-                      accept="image/png,image/jpeg,image/jpg"
-                    />
-                  </label>
-                  {files[index] && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const updatedFiles = [...files];
-                        updatedFiles[index] = null;
-                        setFiles(updatedFiles);
-                      }}
-                      className="mt-1 text-xs text-red-500 hover:text-red-700"
-                    >
-                      Hapus
-                    </button>
-                  )}
-                </div>
-              ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+              <input type="file" ref={fileInputRef} onChange={(e) => handleFileSelect(e.target.files)} multiple accept="image/*" className="hidden" />
             </div>
           </div>
 

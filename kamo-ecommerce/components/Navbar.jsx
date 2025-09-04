@@ -11,11 +11,12 @@ import api from "@/service/api";
 import {
   FaSearch,
   FaSignOutAlt,
-  FaHeart,
   FaShoppingCart,
   FaTimes,
 } from "react-icons/fa";
 import { AnimatePresence, motion } from "framer-motion";
+import { toast } from "react-hot-toast";
+import { HeartIcon, Shareicon } from "../assets/assets";
 
 const Navbar = () => {
   const router = useRouter();
@@ -35,6 +36,34 @@ const Navbar = () => {
       router.push(
         `/all-products?search=${encodeURIComponent(searchTerm.trim())}`
       );
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      // Salin URL ke clipboard
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success("Link berhasil disalin ke clipboard!");
+    } catch (err) {
+      // Fallback untuk browser yang tidak mendukung clipboard API
+      const textArea = document.createElement("textarea");
+      textArea.value = window.location.href;
+      document.body.appendChild(textArea);
+      textArea.select();
+
+      try {
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textArea);
+
+        if (successful) {
+          toast.success("Link berhasil disalin ke clipboard!");
+        } else {
+          toast.error("Gagal menyalin link");
+        }
+      } catch (fallbackError) {
+        document.body.removeChild(textArea);
+        toast.error("Browser tidak mendukung fitur salin");
+      }
     }
   };
 
@@ -91,7 +120,7 @@ const Navbar = () => {
       </div>
 
       {/* Desktop Search and User Actions */}
-      <div className="hidden md:flex items-center gap-4 lg:gap-6 relative">
+      <div className="hidden md:flex items-center gap-2 lg:gap-1 relative">
         {/* Search Input - Modified to look like mobile */}
         <div className="">
           <button
@@ -135,14 +164,25 @@ const Navbar = () => {
           </AnimatePresence>
         </div>
 
+        {/* Share Icon - Desktop */}
+        <button
+          onClick={handleShare}
+          className="z-20 cursor-pointer text-gray-500 hover:text-accent"
+        >
+          <Shareicon className="cursor-pointer" />
+        </button>
+
         {/* User Actions */}
         {user || admin ? (
           <div className="flex items-center gap-3">
             {/* Show wishlist and cart only on desktop (hidden on iPad) */}
             <div className="hidden lg:flex items-center gap-3">
               {user && (
-                <Link href="/profile?tab=wishlist" className="relative">
-                  <FaHeart className="w-5 h-5 text-gray-500 hover:text-red-500" />
+                <Link
+                  href="/profile?tab=wishlist"
+                  className="relative text-gray-500 hover:text-accent"
+                >
+                  <HeartIcon className="w-5 h-5" />
                 </Link>
               )}
               {user && (
@@ -193,14 +233,14 @@ const Navbar = () => {
       </div>
 
       {/* Mobile Icons */}
-      <div className="flex md:hidden items-center gap-4">
+      <div className="flex md:hidden items-center gap-1">
         {/* Search Icon */}
         <button
           onClick={() => {
             setMobileSearchOpen((prev) => !prev);
             setMenuOpen(false); // Tutup menu saat membuka pencarian
           }}
-          className="p-1 z-20"
+          className=" z-20"
         >
           {mobileSearchOpen ? (
             <FaTimes className="w-5 h-5 text-gray-600" />
@@ -208,6 +248,23 @@ const Navbar = () => {
             <FaSearch className="w-5 h-5 text-gray-600" />
           )}
         </button>
+        {/* Share icon */}
+        <button className="z-20" onClick={handleShare}>
+          <Shareicon className="w-5 h-5 text-gray-600 hover:text-accent cursor-pointer" />
+        </button>
+
+        {/* Wishlist Icon */}
+        <button>
+          {user && (
+            <Link
+              href="/profile?tab=wishlist"
+              className="relative w-5 h-5 text-gray-600"
+            >
+              <HeartIcon className="text-gray-500 hover:text-red-500 transition-colors" />
+            </Link>
+          )}
+        </button>
+
         {/* Hamburger Icon */}
         <button
           onClick={() => {

@@ -68,6 +68,7 @@ const FeaturedProduct = () => {
         alt={product.title}
         fill
         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+        onClick={() => (window.location.href = product.button_link || "#")}
         className="group-hover:brightness-75 transition duration-300 object-cover"
       />
       <div className="group-hover:-translate-y-4 transition duration-300 absolute bottom-8 left-8 text-white space-y-2">
@@ -75,7 +76,7 @@ const FeaturedProduct = () => {
         <p className="text-sm lg:text-base leading-5 max-w-60">
           {product.description}
         </p>
-        <Link href={product.button_link || "#"} passHref>
+        {/* <Link href={product.button_link || "#"} passHref>
           <button className="flex items-center gap-1.5 bg-accent px-4 py-2 rounded">
             {product.button_text || "Beli Sekarang"}{" "}
             <Image
@@ -84,7 +85,20 @@ const FeaturedProduct = () => {
               alt="Redirect Icon"
             />
           </button>
-        </Link>
+        </Link> */}
+        <div>
+          <button
+            className="flex items-center gap-1.5 bg-accent px-4 py-2 rounded"
+            onClick={() => (window.location.href = product.button_link || "#")}
+          >
+            Klik disini
+            <Image
+              className="h-3 w-3"
+              src={assets.redirect_icon}
+              alt="Redirect Icon"
+            />
+          </button>
+        </div>
       </div>
     </div>
   );
