@@ -25,6 +25,7 @@ module.exports = (sequelize, DataTypes) => {
       senderId: { type: DataTypes.INTEGER, allowNull: false },
       sender_role: { type: DataTypes.STRING, allowNull: false },
       content: { type: DataTypes.TEXT, allowNull: false },
+      image_url: { type: DataTypes.TEXT, allowNull: true },
       product_id: {
         type: DataTypes.STRING,
         allowNull: true,

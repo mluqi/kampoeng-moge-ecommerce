@@ -256,10 +256,12 @@ exports.createOrder = async (req, res) => {
         (p) => p.product_id === item.product_id
       );
 
-      if (!product) {
+      if (!product || product.product_status !== "active") {
         await t.rollback();
         return res.status(404).json({
-          message: `Produk dengan ID ${item.product_id} tidak ditemukan.`,
+          message: `Produk "${
+            product?.product_name || item.product_id
+          }" tidak tersedia.`,
         });
       }
 
@@ -270,7 +272,24 @@ exports.createOrder = async (req, res) => {
         });
       }
 
-      const itemSubtotal = product.product_price * item.quantity;
+      let priceToUse = product.product_price;
+      if (product.product_is_discount && product.product_discount_status) {
+        const now = new Date();
+        const startDate = product.product_discount_start_date
+          ? new Date(product.product_discount_start_date)
+          : null;
+        const endDate = product.product_discount_end_date
+          ? new Date(product.product_discount_end_date)
+          : null;
+
+        const isDateActive =
+          (!startDate || now >= startDate) && (!endDate || now <= endDate);
+
+        if (isDateActive) {
+          priceToUse = product.product_discount_price;
+        }
+      }
+      const itemSubtotal = priceToUse * item.quantity;
 
       calculatedSubtotal += itemSubtotal;
 
@@ -290,7 +309,7 @@ exports.createOrder = async (req, res) => {
       orderItemsData.push({
         product_id: product.product_id,
         product_name: product.product_name,
-        price: product.product_price,
+        price: priceToUse,
         quantity: item.quantity,
         subtotal: itemSubtotal,
       });
@@ -603,14 +622,40 @@ exports.getAllOrdersAdmin = async (req, res) => {
 
     let whereClause = {};
     if (status) whereClause.status = status;
-    if (search) whereClause.order_id = { [Op.like]: `%${search}%` };
+    if (search) {
+      whereClause[Op.or] = [
+        { order_id: { [Op.like]: `%${search}%` } },
+        // Cari berdasarkan SKU produk di dalam OrderItem
+        // Tanda '$' digunakan untuk merujuk ke model yang di-include
+        { "$items.product.product_sku$": { [Op.like]: `%${search}%` } },
+      ];
+    }
 
     const { count, rows } = await Order.findAndCountAll({
       where: whereClause,
-      include: [{ model: User, attributes: ["user_name", "user_email"] }],
+      include: [
+        {
+          model: OrderItem,
+          as: "items",
+          include: [
+            {
+              model: Product,
+              as: "product",
+              attributes: [
+                "product_id",
+                "product_name",
+                "product_sku",
+                "product_pictures",
+              ],
+            },
+          ],
+        },
+        { model: User, attributes: ["user_name", "user_email"] },
+      ],
       limit: limitNum,
       offset: offset,
       order: [["createdAt", "DESC"]],
+      subQuery: false, // Penting untuk query dengan kondisi pada model yang di-include
     });
 
     const parsedRows = rows.map(parseOrder);
@@ -769,12 +814,10 @@ exports.approveCancelOrder = async (req, res) => {
       syncStockToTiktok(p.productId, p.newStock);
     }
 
-    res
-      .status(200)
-      .json({
-        message: "Pesanan berhasil dibatalkan.",
-        order: parseOrder(order),
-      });
+    res.status(200).json({
+      message: "Pesanan berhasil dibatalkan.",
+      order: parseOrder(order),
+    });
   } catch (error) {
     await t.rollback();
     console.error("Error approving cancellation:", error);

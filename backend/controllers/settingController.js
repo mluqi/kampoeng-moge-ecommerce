@@ -98,3 +98,18 @@ exports.updateActiveShippingServices = async (req, res) => {
       .json({ message: "Gagal memperbarui layanan pengiriman JNE." });
   }
 };
+
+exports.updateCategoryColour = async (req, res) => {
+  try {
+    const { colour } = req.body;
+    await Setting.upsert({
+      key: "category_colour",
+      value: colour,
+      group: "category",
+    });
+    res.status(200).json({ message: "Warna kategori berhasil diperbarui." });
+  } catch (error) {
+    console.error("Error updating category colour:", error);
+    res.status(500).json({ message: "Gagal memperbarui warna kategori." });
+  }
+};

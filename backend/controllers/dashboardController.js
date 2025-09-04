@@ -139,7 +139,7 @@ exports.getSalesChartData = async (req, res) => {
         [sequelize.fn("DATE", sequelize.col("createdAt")), "date"],
         [sequelize.fn("SUM", sequelize.col("total_amount")), "totalSales"],
       ],
-      where: { status: "completed", ...dateFilter },
+      where: { status: "processing", ...dateFilter },
       group: [sequelize.fn("DATE", sequelize.col("createdAt"))],
       order: [[sequelize.fn("DATE", sequelize.col("createdAt")), "ASC"]],
       raw: true,

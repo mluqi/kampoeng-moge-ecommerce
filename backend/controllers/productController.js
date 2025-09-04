@@ -4,7 +4,7 @@ const {
   ProductViews,
   User,
   admin_akses,
-  sequelize
+  sequelize,
 } = require("../models");
 const { getToken } = require("next-auth/jwt");
 const { Op } = require("sequelize");
@@ -90,7 +90,15 @@ async function generateCategoryId() {
 // Get all products
 exports.getAllProducts = async (req, res) => {
   try {
-    const { page = 1, limit = 12, category, search, status } = req.query;
+    const {
+      page = 1,
+      limit = 12,
+      category,
+      search,
+      status,
+      discountStatus,
+      discountActivity,
+    } = req.query;
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
@@ -115,6 +123,20 @@ exports.getAllProducts = async (req, res) => {
 
     if (status && ["active", "inactive"].includes(status)) {
       whereClause.product_status = status;
+    }
+
+    if (discountStatus === "true") {
+      whereClause.product_is_discount = true;
+      // Jika kita berada di halaman diskon, kita bisa memfilter berdasarkan status aktivitas diskon
+      if (discountActivity === "active") {
+        whereClause.product_discount_status = true;
+      }
+      if (discountActivity === "inactive") {
+        whereClause.product_discount_status = false;
+      }
+    }
+    if (discountStatus === "false") {
+      whereClause.product_is_discount = { [Op.or]: [false, null] };
     }
 
     const { count, rows } = await Product.findAndCountAll({
@@ -203,8 +225,30 @@ exports.getAllProductsWithoutOutOfStock = async (req, res) => {
       order: orderClause,
     });
 
+    const parsedRows = rows.map((productInstance) => {
+      const product = parseProductJSONFields(productInstance);
+      // For public view, determine if the discount is currently active.
+      if (product.product_is_discount) {
+        const now = new Date();
+        const startDate = product.product_discount_start_date
+          ? new Date(product.product_discount_start_date)
+          : null;
+        const endDate = product.product_discount_end_date
+          ? new Date(product.product_discount_end_date)
+          : null;
+
+        const isDateActive =
+          (!startDate || now >= startDate) && (!endDate || now <= endDate);
+
+        // Discount is only shown if it's globally enabled, manually active, and within the date range.
+        product.product_is_discount =
+          product.product_discount_status && isDateActive;
+      }
+      return product;
+    });
+
     res.status(200).json({
-      data: rows.map(parseProductJSONFields), // Parse JSON fields before sending
+      data: parsedRows,
       totalPages: Math.ceil(count / limitNum),
       currentPage: pageNum,
       totalProducts: count,
@@ -218,13 +262,39 @@ exports.getAllProductsWithoutOutOfStock = async (req, res) => {
 // Get product by ID
 exports.getProductById = async (req, res) => {
   try {
+    const { from } = req.query;
     const product = await Product.findByPk(req.params.id, {
       include: [{ model: Category, as: "category" }],
     });
     if (!product) return res.status(404).json({ message: "Product not found" });
 
+    // For public access, if the product is not active, treat it as not found,
+    // unless the request is explicitly from the admin panel.
+    if (product.product_status !== "active" && from !== "admin") {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
     // Parse the JSON fields before further processing and sending the response
     const parsedProduct = parseProductJSONFields(product);
+
+    // For public view, determine if the discount is currently active.
+    if (parsedProduct.product_is_discount) {
+      const now = new Date();
+      const startDate = parsedProduct.product_discount_start_date
+        ? new Date(parsedProduct.product_discount_start_date)
+        : null;
+      const endDate = parsedProduct.product_discount_end_date
+        ? new Date(parsedProduct.product_discount_end_date)
+        : null;
+
+      const isDateActive =
+        (!startDate || now >= startDate) && (!endDate || now <= endDate);
+
+      // Discount is only shown if it's globally enabled, manually active,
+      // and within the date range.
+      parsedProduct.product_is_discount =
+        parsedProduct.product_discount_status && isDateActive;
+    }
 
     res.status(200).json(parsedProduct);
   } catch (error) {
@@ -363,7 +433,8 @@ exports.createProduct = async (req, res) => {
       product_description: description,
       product_sku: sku,
       product_price: price,
-      product_price_tiktok: product_price_tiktok,
+      product_price_tiktok:
+        product_price_tiktok === "" ? null : product_price_tiktok,
       product_stock: stock,
       product_condition: condition,
       product_status: status,
@@ -618,7 +689,8 @@ exports.updateProduct = async (req, res) => {
       product_description: description,
       product_sku: sku,
       product_price: price,
-      product_price_tiktok: product_price_tiktok,
+      product_price_tiktok:
+        product_price_tiktok === "" ? null : product_price_tiktok,
       product_stock: stock,
       product_condition: condition,
       product_status: status,
@@ -1003,7 +1075,10 @@ exports.getProductsByCategory = async (req, res) => {
     }
 
     const products = await Product.findAll({
-      where: { product_category: category.category_id },
+      where: {
+        product_category: category.category_id,
+        product_status: "active",
+      },
       include: [{ model: Category, as: "category" }],
     });
 
@@ -1183,7 +1258,11 @@ exports.recordProductView = async (req, res) => {
     }
 
     // Opsional: Ambil user ID jika user login
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getToken({
+      req,
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: process.env.NODE_ENV === "production",
+    });
     let userId = null;
     if (token && token.email) {
       const user = await User.findOne({ where: { user_email: token.email } });
@@ -1225,5 +1304,237 @@ exports.recordProductView = async (req, res) => {
   } catch (error) {
     console.error("Error saat mencatat tampilan produk:", error);
     res.status(500).json({ message: "Gagal mencatat tampilan produk." });
+  }
+};
+
+/**
+ * @description Update specific fields of a product for inline editing in the admin panel.
+ * @route PUT /api/products/admin/inline-edit/:id
+ * @access Admin
+ */
+exports.updateProductInline = async (req, res) => {
+  const { id } = req.params;
+  const { price, product_price_tiktok, stock } = req.body;
+
+  try {
+    const product = await Product.findByPk(id);
+    if (!product) {
+      return res.status(404).json({ message: "Produk tidak ditemukan" });
+    }
+
+    const oldStock = product.product_stock;
+
+    // Update only the fields that are provided
+    if (price !== undefined) {
+      // Jika harga kosong, simpan sebagai NULL, bukan 0, agar sesuai dengan skema DB.
+      product.product_price = price;
+    }
+    if (product_price_tiktok !== undefined) {
+      // Lakukan hal yang sama untuk harga TikTok untuk mencegah error
+      product.product_price_tiktok =
+        product_price_tiktok === "" ? null : product_price_tiktok;
+    }
+    if (stock !== undefined) {
+      product.product_stock = stock;
+    }
+
+    await product.save();
+
+    // Sync stock to TikTok if it has changed and the product is linked
+    if (
+      stock !== undefined &&
+      stock !== oldStock &&
+      product.product_tiktok_id
+    ) {
+      exports.syncStockToTiktok(product.product_id, stock);
+    }
+
+    res.status(200).json({
+      message: "Produk berhasil diperbarui.",
+      product: parseProductJSONFields(product),
+    });
+  } catch (error) {
+    console.error("Error updating product inline:", error);
+    res.status(500).json({ message: "Gagal memperbarui produk." });
+  }
+};
+
+/**
+ * @description Update the discount status and price of a product.
+ * @route PUT /api/products/admin/discount-status/:id
+ * @access Admin
+ */
+exports.updateDiscountStatus = async (req, res) => {
+  const { id } = req.params;
+  const {
+    is_discount,
+    discount_status,
+    discount_percentage,
+    start_date,
+    end_date,
+  } = req.body;
+
+  // Validate discount_status if it's present
+  if (
+    (discount_status !== undefined && typeof discount_status !== "boolean") ||
+    (is_discount !== undefined && typeof is_discount !== "boolean")
+  ) {
+    return res.status(400).json({ message: "Status diskon tidak valid." });
+  }
+
+  try {
+    const product = await Product.findByPk(id);
+    if (!product) {
+      return res.status(404).json({ message: "Produk tidak ditemukan." });
+    }
+
+    // Case 1: Setting the product to be part of the discount program
+    if (is_discount !== undefined) {
+      product.product_is_discount = is_discount;
+      // When adding a product to discount, it should be active by default
+      if (is_discount === true) {
+        product.product_discount_status = true;
+      }
+    }
+
+    // Case 2: Toggling the discount status (active/inactive)
+    if (discount_status !== undefined) {
+      product.product_discount_status = discount_status;
+    }
+
+    // Case 3: Saving discount percentage
+    if (discount_percentage !== undefined) {
+      const percentage = parseFloat(discount_percentage);
+      if (isNaN(percentage) || percentage < 0 || percentage > 100) {
+        return res
+          .status(400)
+          .json({ message: "Persentase diskon harus antara 0 dan 100." });
+      }
+      product.product_discount_percentage = percentage;
+      // Hitung harga diskon secara otomatis
+      const originalPrice = parseFloat(product.product_price);
+      const discountPrice = originalPrice * (1 - percentage / 100);
+      product.product_discount_price = Math.round(discountPrice);
+    }
+
+    // Case 4: Saving discount dates
+    // Use hasOwnProperty to correctly handle null values for dates
+    if (req.body.hasOwnProperty("start_date")) {
+      product.product_discount_start_date = start_date;
+    }
+    if (req.body.hasOwnProperty("end_date")) {
+      product.product_discount_end_date = end_date;
+    }
+
+    await product.save();
+    res.status(200).json({ message: `Diskon produk berhasil diperbarui.` });
+  } catch (error) {
+    console.error("Error updating discount status:", error);
+    res.status(500).json({ message: "Gagal memperbarui status diskon." });
+  }
+};
+
+/**
+ * @description Update the discount status for multiple products at once.
+ * @route PUT /api/products/admin/discount-status/bulk
+ * @access Admin
+ */
+exports.updateMultipleDiscountStatus = async (req, res) => {
+  const { productIds, discount_percentage, start_date, end_date } = req.body;
+
+  if (!Array.isArray(productIds) || productIds.length === 0) {
+    return res.status(400).json({
+      message: "Product IDs harus berupa array dan tidak boleh kosong.",
+    });
+  }
+
+  const percentage = parseFloat(discount_percentage);
+  if (isNaN(percentage) || percentage < 0 || percentage > 100) {
+    return res
+      .status(400)
+      .json({ message: "Persentase diskon harus antara 0 dan 100." });
+  }
+
+  const t = await sequelize.transaction();
+
+  try {
+    const products = await Product.findAll({
+      where: { product_id: { [Op.in]: productIds } },
+      transaction: t,
+    });
+
+    for (const product of products) {
+      product.product_is_discount = true;
+      product.product_discount_percentage = percentage;
+      const originalPrice = parseFloat(product.product_price);
+      const discountPrice = originalPrice * (1 - percentage / 100);
+      product.product_discount_price = Math.round(discountPrice);
+      product.product_discount_start_date = start_date || null;
+      product.product_discount_end_date = end_date || null;
+      await product.save({ transaction: t });
+    }
+
+    await t.commit();
+    res
+      .status(200)
+      .json({ message: `${products.length} produk berhasil diberi diskon.` });
+  } catch (error) {
+    await t.rollback();
+    console.error("Error updating multiple discount statuses:", error);
+    res.status(500).json({ message: "Gagal memperbarui status diskon." });
+  }
+};
+
+/**
+ * @description Deletes a discount from a product by setting is_discount to false and clearing related fields.
+ * @route DELETE /api/products/admin/discount/:id
+ * @access Admin
+ */
+exports.deleteDiscount = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const product = await Product.findByPk(id);
+    if (!product) {
+      return res.status(404).json({ message: "Produk tidak ditemukan." });
+    }
+
+    // Set is_discount to false and clear all discount-related fields
+    product.product_is_discount = false;
+    product.product_discount_price = null;
+    product.product_discount_percentage = null;
+    product.product_discount_start_date = null;
+    product.product_discount_end_date = null;
+
+    await product.save();
+
+    res.status(200).json({ message: "Diskon untuk produk telah dihapus." });
+  } catch (error) {
+    console.error("Error deleting discount:", error);
+    res.status(500).json({ message: "Gagal menghapus diskon." });
+  }
+};
+
+/**
+ * @description Get multiple products by their IDs.
+ * @route POST /api/products/admin/by-ids
+ * @access Admin
+ */
+exports.getProductsByIds = async (req, res) => {
+  const { productIds } = req.body;
+
+  if (!Array.isArray(productIds) || productIds.length === 0) {
+    return res.status(400).json({
+      message: "Product IDs harus berupa array dan tidak boleh kosong.",
+    });
+  }
+
+  try {
+    const products = await Product.findAll({
+      where: { product_id: { [Op.in]: productIds } },
+    });
+    res.status(200).json(products.map(parseProductJSONFields));
+  } catch (error) {
+    res.status(500).json({ message: "Gagal mengambil data produk." });
   }
 };

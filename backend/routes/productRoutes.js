@@ -24,6 +24,11 @@ const {
   partialUpdateTiktokProduct,
   getProductStatusTiktok,
   recordProductView,
+  updateProductInline,
+  updateDiscountStatus,
+  updateMultipleDiscountStatus,
+  deleteDiscount,
+  getProductsByIds,
 } = require("../controllers/productController");
 const multer = require("multer");
 const fs = require("fs");
@@ -39,6 +44,16 @@ const categoryStorage = multer.diskStorage({
   },
 });
 const uploadCategory = multer({ storage: categoryStorage });
+
+router.put("/admin/inline-edit/:id", authMiddleware, updateProductInline);
+router.put(
+  "/admin/discount-status/bulk",
+  authMiddleware,
+  updateMultipleDiscountStatus
+);
+router.put("/admin/discount-status/:id", authMiddleware, updateDiscountStatus);
+router.delete("/admin/discount/:id", authMiddleware, deleteDiscount);
+router.post("/admin/by-ids", authMiddleware, getProductsByIds);
 
 // TikTok Routes
 router.get("/tiktok/:id/status", authMiddleware, getProductStatusTiktok);

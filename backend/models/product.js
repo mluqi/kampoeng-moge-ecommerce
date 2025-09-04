@@ -66,7 +66,22 @@ module.exports = (sequelize, DataTypes) => {
       product_weight: DataTypes.FLOAT,
       product_dimensions: DataTypes.TEXT,
       product_pictures: DataTypes.TEXT,
-      product_wholesale_prices: DataTypes.TEXT,
+      product_is_discount: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
+      product_discount_percentage: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+      },
+      product_discount_price: DataTypes.BIGINT,
+      product_discount_start_date: DataTypes.DATE,
+      product_discount_end_date: DataTypes.DATE,
+      product_discount_status: {
+        type: DataTypes.BOOLEAN,
+        allowNull: true,
+        defaultValue: false,
+      },
       product_logistics: DataTypes.TEXT,
       product_annotations: DataTypes.TEXT,
       product_brand: DataTypes.STRING,

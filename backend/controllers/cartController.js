@@ -59,7 +59,26 @@ exports.getCart = async (req, res) => {
       const plainItem = item.toJSON();
       // Pastikan produk ada sebelum di-parse
       if (item.product) {
-        plainItem.product = parseProductJSONFields(item.product);
+        const parsedProduct = parseProductJSONFields(item.product);
+        // For public view, determine if the discount is currently active.
+        if (parsedProduct.product_is_discount) {
+          const now = new Date();
+          const startDate = parsedProduct.product_discount_start_date
+            ? new Date(parsedProduct.product_discount_start_date)
+            : null;
+          const endDate = parsedProduct.product_discount_end_date
+            ? new Date(parsedProduct.product_discount_end_date)
+            : null;
+
+          const isDateActive =
+            (!startDate || now >= startDate) && (!endDate || now <= endDate);
+
+          // Discount is only shown if it's globally enabled, manually active,
+          // and within the date range.
+          parsedProduct.product_is_discount =
+            parsedProduct.product_discount_status && isDateActive;
+        }
+        plainItem.product = parsedProduct;
       }
       return plainItem;
     });
@@ -83,7 +102,9 @@ exports.addToCart = async (req, res) => {
     if (!user) return res.status(401).json({ message: "Unauthorized" });
 
     const product = await Product.findByPk(productId);
-    if (!product) return res.status(404).json({ message: "Product not found" });
+    if (!product || product.product_status !== "active") {
+      return res.status(404).json({ message: "Product not found" });
+    }
 
     // Cek stok sebelum menambah ke keranjang
     if (product.product_stock < quantity) {

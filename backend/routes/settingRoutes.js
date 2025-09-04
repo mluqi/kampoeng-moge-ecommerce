@@ -5,6 +5,7 @@ const {
   getAllSettings,
   updateSettings,
   updateActiveShippingServices,
+  updateCategoryColour,
   getSettingByKey,
 } = require("../controllers/settingController");
 const multer = require("multer");
@@ -27,5 +28,6 @@ router.get("/", getAllSettings);
 router.put("/", authMiddleware, uploadLogo.single("logo"), updateSettings);
 
 router.put("/shipping-services", authMiddleware, updateActiveShippingServices);
+router.put("/category-colour", authMiddleware, updateCategoryColour)
 
 module.exports = router;

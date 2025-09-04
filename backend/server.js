@@ -23,13 +23,17 @@ const featuredProductRoutes = require("./routes/featuredProductRoutes");
 const headerSlideRoutes = require("./routes/headerSlideRoutes");
 const loginBannerRoutes = require("./routes/loginBannerRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+
+const tiktokRoutes = require("./routes/tiktokRoutes");
 
 // Cron job
 const {
   startScheduledJobs,
   checkAndRefreshTokenOnStart,
 } = require("./cron/scheduler");
-const tiktokRoutes = require("./routes/tiktokRoutes");
+const {scheduleChatCleanup} = require("./cron/cleanupJobs");
+
 
 const app = express();
 const server = http.createServer(app);
@@ -72,6 +76,7 @@ app.use("/kamo/header-slides", headerSlideRoutes);
 app.use("/kamo/login-banners", loginBannerRoutes);
 app.use("/kamo/tiktok", tiktokRoutes);
 app.use("/kamo/analytics", analyticsRoutes);
+app.use("/kamo/admins", adminRoutes);
 
 const PORT = process.env.PORT || 8000;
 
@@ -80,6 +85,7 @@ const startServer = async () => {
     await checkAndRefreshTokenOnStart();
 
     startScheduledJobs();
+    scheduleChatCleanup();
 
     server.listen(PORT, () => {
       console.log(`🚀 Server is running on PORT ${PORT}`);

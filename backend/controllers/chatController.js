@@ -95,7 +95,7 @@ exports.sendMessageAdmin = async (req, res) => {
         .json({ message: "Unauthorized: Admin not found." });
     }
 
-    const { conversationId, content } = req.body;
+    const { conversationId, content, product_id } = req.body;
 
     if (!content || !conversationId) {
       return res
@@ -110,8 +110,18 @@ exports.sendMessageAdmin = async (req, res) => {
       return res.status(404).json({ message: "Percakapan tidak ditemukan." });
     }
 
+    // [BARU] Cek apakah ada file gambar yang diunggah
+    const imageUrl = req.file ? `/uploads/chat/${req.file.filename}` : null;
+
     const message = await Message.create(
-      { conversationId, senderId, content, sender_role: "admin" },
+      {
+        conversationId,
+        senderId,
+        content,
+        sender_role: "admin",
+        product_id: product_id || null, // Pesan dari admin tidak terkait produk
+        image_url: imageUrl, // Simpan URL gambar
+      },
       { transaction: t }
     );
 
@@ -119,13 +129,21 @@ exports.sendMessageAdmin = async (req, res) => {
     await conversation.save({ transaction: t });
 
     await t.commit();
-    // Hapus emit ke Socket.IO
-    // const receiverId = conversation.userId;
-    // req.io
-    //   .to(receiverId.toString())
-    //   .emit("receive_message", { ...message.get(), conversationId });
 
-    res.status(201).json(message);
+    // Ambil kembali pesan yang baru dibuat dengan data produknya untuk dikirim ke client
+    const newMessage = await Message.findByPk(message.id, {
+      include: [
+        { model: User, as: "sender" },
+        { model: Product, as: "product" },
+      ],
+    });
+
+    const newMessageJSON = newMessage.toJSON();
+    if (newMessageJSON.product) {
+      parseProductPictures(newMessageJSON.product);
+    }
+
+    res.status(201).json(newMessageJSON);
   } catch (error) {
     await t.rollback();
     console.error("Error sending message from admin:", error);
@@ -179,6 +197,9 @@ exports.sendMessage = async (req, res) => {
       return res.status(404).json({ message: "Percakapan tidak ditemukan." });
     }
 
+    // [BARU] Cek apakah ada file gambar yang diunggah
+    const imageUrl = req.file ? `/uploads/chat/${req.file.filename}` : null;
+
     const message = await Message.create(
       {
         conversationId,
@@ -186,6 +207,7 @@ exports.sendMessage = async (req, res) => {
         sender_role: "user",
         content,
         product_id: product_id || null,
+        image_url: imageUrl, // Simpan URL gambar
       },
       { transaction: t }
     );

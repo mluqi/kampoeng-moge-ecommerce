@@ -40,60 +40,36 @@ const parseProductJSONFields = (productData) => {
   return product;
 };
 
-// Helper function to get start date from period string like "24h" or "7d"
-const getStartDateFromPeriod = (periodStr = "24h") => {
-  const now = new Date();
-  if (periodStr.endsWith("h")) {
-    const hours = parseInt(periodStr, 10);
-    if (!isNaN(hours)) {
-      return new Date(now.setHours(now.getHours() - hours));
-    }
-  }
-
-  const days = parseInt(periodStr, 10);
-  if (!isNaN(days)) {
-    return new Date(now.setDate(now.getDate() - days));
-  }
-
-  // Fallback for invalid format, default to 7 days
-  return new Date(new Date().setDate(new Date().getDate() - 7));
-};
-
-// Helper function untuk menentukan rentang tanggal dari query params
-const getDateRange = (query) => {
+/**
+ * Helper function to get consistent start and end dates from query parameters.
+ * @param {object} query - The request query object.
+ * @returns {{startDate: Date, endDate: Date}}
+ */
+const getStartAndEndDates = (query) => {
   const { period = "7d", startDate, endDate } = query;
 
-  // Prioritaskan rentang tanggal kustom jika ada
+  // Priority to custom date range
   if (startDate && endDate) {
-    return {
-      [Op.between]: [new Date(startDate), new Date(endDate)],
-    };
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999); // Include the whole end day
+    return { startDate: new Date(startDate), endDate: end };
   }
 
-  // Fallback ke periode preset
-  let intervalValue;
-  let intervalUnit = "DAY";
+  const now = new Date();
+  let start;
 
-  switch (period) {
-    case "24h":
-      intervalValue = 1;
-      break;
-    case "3d":
-      intervalValue = 3;
-      break;
-    case "30d":
-      intervalValue = 30;
-      break;
-    case "7d":
-    default:
-      intervalValue = 7;
-      break;
+  if (period.endsWith("h")) {
+    const hours = parseInt(period, 10);
+    if (!isNaN(hours)) {
+      start = new Date(now.getTime() - hours * 60 * 60 * 1000);
+    }
+  } else {
+    // Default to days
+    const days = parseInt(period, 10) || 7; // Default to 7 days if format is invalid
+    start = new Date(new Date().setDate(now.getDate() - days));
   }
-  return {
-    [Op.gte]: sequelize.literal(
-      `NOW() - INTERVAL ${intervalValue} ${intervalUnit}`
-    ),
-  };
+
+  return { startDate: start, endDate: new Date() };
 };
 
 /**
@@ -109,51 +85,31 @@ exports.getTopProducts = async (req, res) => {
 
   // Determine order based on sort parameter
   let orderClause;
-  let whereClause;
-  
+  let whereClause = {};
+
   switch (sort) {
     case "views":
       orderClause = [
         [sequelize.literal("view_count"), "DESC"],
         ["product_name", "ASC"],
       ];
-      // Filter hanya produk yang memiliki views
-      whereClause = {
-        [Op.and]: [
-          sequelize.literal(`(
-            EXISTS (SELECT 1 FROM ProductViews WHERE ProductViews.product_id = Product.product_id AND ProductViews.viewed_at BETWEEN :startDate AND :endDate)
-          )`),
-          sequelize.literal(`(
-            SELECT COUNT(DISTINCT ProductViews.id)
-            FROM ProductViews
-            WHERE ProductViews.product_id = Product.product_id
-            AND ProductViews.viewed_at BETWEEN :startDate AND :endDate
-          ) > 0`)
-        ]
-      };
+      whereClause = sequelize.literal(`(
+        SELECT COUNT(DISTINCT ProductViews.id) FROM ProductViews
+        WHERE ProductViews.product_id = Product.product_id AND ProductViews.viewed_at BETWEEN :startDate AND :endDate
+      ) > 0`);
       break;
-      
+
     case "carts":
       orderClause = [
         [sequelize.literal("cart_add_count"), "DESC"],
         ["product_name", "ASC"],
       ];
-      // Filter hanya produk yang memiliki cart adds
-      whereClause = {
-        [Op.and]: [
-          sequelize.literal(`(
-            EXISTS (SELECT 1 FROM CartItem WHERE CartItem.product_id = Product.product_id AND CartItem.createdAt BETWEEN :startDate AND :endDate)
-          )`),
-          sequelize.literal(`(
-            SELECT COALESCE(SUM(CartItem.quantity), 0)
-            FROM CartItem
-            WHERE CartItem.product_id = Product.product_id
-            AND CartItem.createdAt BETWEEN :startDate AND :endDate
-          ) > 0`)
-        ]
-      };
+      whereClause = sequelize.literal(`(
+        SELECT COUNT(DISTINCT CartItem.id) FROM CartItem
+        WHERE CartItem.product_id = Product.product_id AND CartItem.updatedAt BETWEEN :startDate AND :endDate
+      ) > 0`);
       break;
-      
+
     case "combined":
     default:
       orderClause = [
@@ -167,7 +123,7 @@ exports.getTopProducts = async (req, res) => {
             EXISTS (SELECT 1 FROM ProductViews WHERE ProductViews.product_id = Product.product_id AND ProductViews.viewed_at BETWEEN :startDate AND :endDate)
           )`),
           sequelize.literal(`(
-            EXISTS (SELECT 1 FROM CartItem WHERE CartItem.product_id = Product.product_id AND CartItem.createdAt BETWEEN :startDate AND :endDate)
+            EXISTS (SELECT 1 FROM CartItem WHERE CartItem.product_id = Product.product_id AND CartItem.updatedAt BETWEEN :startDate AND :endDate)
           )`),
         ],
       };
@@ -175,6 +131,8 @@ exports.getTopProducts = async (req, res) => {
   }
 
   try {
+    const { startDate, endDate } = getStartAndEndDates(req.query);
+
     const { count, rows } = await Product.findAndCountAll({
       attributes: {
         include: [
@@ -192,7 +150,7 @@ exports.getTopProducts = async (req, res) => {
               SELECT COALESCE(SUM(CartItem.quantity), 0)
               FROM CartItem
               WHERE CartItem.product_id = Product.product_id
-              AND CartItem.createdAt BETWEEN :startDate AND :endDate
+              AND CartItem.updatedAt BETWEEN :startDate AND :endDate
             )`),
             "cart_add_count",
           ],
@@ -203,10 +161,8 @@ exports.getTopProducts = async (req, res) => {
       limit: limitNum,
       offset: offset,
       replacements: {
-        startDate: req.query.startDate
-          ? new Date(req.query.startDate)
-          : getStartDateFromPeriod(req.query.period),
-        endDate: req.query.endDate ? new Date(req.query.endDate) : new Date(),
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
       },
     });
 
@@ -238,13 +194,15 @@ exports.getTopProducts = async (req, res) => {
  */
 exports.getProductViewers = async (req, res) => {
   const { productId } = req.params;
-  const dateRange = getDateRange(req.query);
+  const { startDate, endDate } = getStartAndEndDates(req.query);
 
   try {
     const views = await ProductViews.findAll({
       where: {
         product_id: productId,
-        viewed_at: dateRange,
+        viewed_at: {
+          [Op.between]: [startDate, endDate],
+        },
       },
       include: [
         {
@@ -287,20 +245,24 @@ exports.getProductViewers = async (req, res) => {
  */
 exports.getProductCartAdds = async (req, res) => {
   const { productId } = req.params;
-  const dateRange = getDateRange(req.query);
+  const { startDate, endDate } = getStartAndEndDates(req.query);
 
   try {
     const cartAdds = await CartItem.findAll({
       where: {
         product_id: productId,
-        createdAt: dateRange,
+        updatedAt: {
+          [Op.between]: [startDate, endDate],
+        },
       },
-      include: [{ 
-        model: User, 
-        as: "User",
-        attributes: ["user_id", "user_email", "user_name"],
-        required: false, // Allow cart items without users (guest checkout)
-      }],
+      include: [
+        {
+          model: User,
+          as: "User",
+          attributes: ["user_id", "user_email", "user_name"],
+          required: false, // Allow cart items without users (guest checkout)
+        },
+      ],
       order: [["createdAt", "DESC"]],
     });
 
