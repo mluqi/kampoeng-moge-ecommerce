@@ -168,9 +168,7 @@ const ChatWidget = () => {
                     <div
                       key={msg.id}
                       className={`flex flex-col gap-2 ${
-                        msg.sender_role === "user"
-                          ? "items-end"
-                          : "items-start"
+                        msg.sender_role === "user" ? "items-end" : "items-start"
                       }`}
                     >
                       <div className="flex justify-center">
@@ -317,7 +315,9 @@ const ChatWidget = () => {
                 <button
                   type="submit"
                   className="bg-accent text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-accent/90 disabled:bg-gray-300"
-                  disabled={!isChatReady || (!newMessage.trim() && !imageToSend)}
+                  disabled={
+                    !isChatReady || (!newMessage.trim() && !imageToSend)
+                  }
                 >
                   <FaPaperPlane size={16} />
                 </button>

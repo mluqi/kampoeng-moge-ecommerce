@@ -97,20 +97,18 @@ const ProductCard = ({ product }) => {
         isOutOfStock ? "opacity-75" : ""
       }`}
     >
-      {/* Product Image */}
-      <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden mb-3 group">
-        {/* Discount Badge */}
-        {product.product_is_discount && (
-          <div className="absolute top-0 left-0 z-10 text-white">
-            <div className="relative w-14 h-14">
-              <LabelDiskon className="text-[#F84B62]" />
-              <div className="absolute text-white inset-0 flex items-center justify-center text-xs font-bold transform -translate-y-2 -translate-x-1">
-                {product.product_discount_percentage}%
-              </div>
+      {/* Discount Badge */}
+      {product.product_is_discount && (
+        <div className="absolute top-0 left-0 z-10 text-white -translate-y-[-5%] -translate-x-2 md:-translate-y-[-5%]">
+          <div className="relative w-14 h-14">
+            <LabelDiskon className="text-[#F84B62]" />
+            <div className="absolute text-white inset-0 flex items-center justify-center text-[9px] md:text-xs font-bold transform -translate-y-[18%] -translate-x-2 md:-translate-y-[12%] md:-translate-x-1">
+              {product.product_discount_percentage}%
             </div>
           </div>
-        )}
-
+        </div>
+      )}
+      <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden mb-3 group">
         {/* Wishlist Button */}
         {/* <button
           onClick={handleWishlistClick}
@@ -124,6 +122,7 @@ const ProductCard = ({ product }) => {
           />
         </button> */}
 
+        {/* Product Image */}
         <Image
           src={
             product.product_pictures?.[0]

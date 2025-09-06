@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import Image from "next/image";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import api from "@/service/api";
@@ -149,16 +150,21 @@ export default function ProductFilterBar({
                 key={`${slide.id}-${index}`}
                 onClick={() => handleSlideClick(slide)}
                 className={`relative h-32 w-32 rounded-lg overflow-hidden transition-all cursor-pointer
-                flex items-end bg-cover bg-center flex-shrink-0
+                flex items-end flex-shrink-0
                 ${isSelected(slide) ? "ring-2 ring-accent ring-offset-2" : ""}`}
-                style={{
-                  backgroundImage: `url('${slide.image}')`,
-                }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
+                <Image
+                  src={slide.image}
+                  alt={slide.label}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 30vw, (max-width: 1200px) 20vw, 128px"
+                  priority={index < 5} // Prioritaskan beberapa gambar pertama
+                />
                 <span
-                  className="font-medium text-sm drop-shadow-md mb-1 ml-3"
+                  className="relative z-10 font-medium text-sm drop-shadow-md mb-1 ml-3"
                   style={{ color: categoryColor }}
                 >
                   {slide.label}

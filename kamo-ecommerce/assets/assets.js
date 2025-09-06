@@ -154,7 +154,7 @@ export const assets = {
 export const LabelDiskon = () => {
   return (
     <svg
-      className="w-12 h-12"
+      className="lg:w-12 lg:h-12 w-10 h-10"
       xmlns="http://www.w3.org/2000/svg"
       width="3000"
       height="2400"

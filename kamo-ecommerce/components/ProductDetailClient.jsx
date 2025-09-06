@@ -348,7 +348,7 @@ const ProductDetailClient = ({ initialProductData }) => {
               <div className="absolute top-0 left-0 text-white">
                 <div className="relative w-14 h-14 -translate-x-3 md:-translate-y-0 -translate-y-1">
                   <LabelDiskon className="text-[#F84B62]" />
-                  <div className="absolute bottom-4 right-2 text-white inset-0 flex items-center justify-center text-xs font-bold transform">
+                  <div className="absolute bottom-4 right-2 text-white inset-0 flex items-center justify-center text-[10px] md:text-xs font-bold transform -translate-y-[8%] -translate-x-1 md:-translate-y-0 md:-translate-x-0">
                     {productData.product_discount_percentage}%
                   </div>
                 </div>
@@ -365,10 +365,7 @@ const ProductDetailClient = ({ initialProductData }) => {
                   </span>
                 ) : (
                   <span className="text-3xl font-bold text-gray-900">
-                    Rp{" "}
-                    {productData.product_price?.toLocaleString(
-                      "id-ID"
-                    )}
+                    Rp {productData.product_price?.toLocaleString("id-ID")}
                   </span>
                 )}
               </div>

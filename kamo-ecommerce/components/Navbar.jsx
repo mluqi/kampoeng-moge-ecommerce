@@ -176,7 +176,7 @@ const Navbar = () => {
         {user || admin ? (
           <div className="flex items-center gap-3">
             {/* Show wishlist and cart only on desktop (hidden on iPad) */}
-            <div className="hidden lg:flex items-center gap-3">
+            <div className="hidden lg:flex md:flex items-center gap-3">
               {user && (
                 <Link
                   href="/profile?tab=wishlist"
@@ -240,27 +240,27 @@ const Navbar = () => {
             setMobileSearchOpen((prev) => !prev);
             setMenuOpen(false); // Tutup menu saat membuka pencarian
           }}
-          className=" z-20"
+          className="z-20 text-gray-500"
         >
           {mobileSearchOpen ? (
-            <FaTimes className="w-5 h-5 text-gray-600" />
+            <FaTimes className="w-5 h-5" />
           ) : (
-            <FaSearch className="w-5 h-5 text-gray-600" />
+            <FaSearch className="w-5 h-5" />
           )}
         </button>
         {/* Share icon */}
-        <button className="z-20" onClick={handleShare}>
-          <Shareicon className="w-5 h-5 text-gray-600 hover:text-accent cursor-pointer" />
+        <button className="z-20 text-gray-500" onClick={handleShare}>
+          <Shareicon className="w-5 h-5 cursor-pointer" />
         </button>
-
+        
         {/* Wishlist Icon */}
         <button>
           {user && (
             <Link
               href="/profile?tab=wishlist"
-              className="relative w-5 h-5 text-gray-600"
+              className="relative w-5 h-5 text-gray-500"
             >
-              <HeartIcon className="text-gray-500 hover:text-red-500 transition-colors" />
+              <HeartIcon className="hover:text-red-500 transition-colors" />
             </Link>
           )}
         </button>
@@ -272,7 +272,7 @@ const Navbar = () => {
             setMobileSearchOpen(false); // Tutup pencarian saat membuka menu
           }}
           className="z-20"
-          aria-label="Toggle menu"
+          aria-label="Toggle menu text-gray-500"
         >
           {menuOpen ? (
             <svg

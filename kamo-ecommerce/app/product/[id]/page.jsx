@@ -8,6 +8,8 @@ import { notFound } from "next/navigation";
 const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
+export const dynamic = "force-dynamic"; 
+
 // Helper function to clean HTML for metadata
 function stripHtmlAndTruncate(html, length) {
   if (!html) return "";

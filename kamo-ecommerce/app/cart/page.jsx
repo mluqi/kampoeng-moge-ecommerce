@@ -140,7 +140,12 @@ const Cart = () => {
                           <div className="pr-4">
                             <p
                               className="font-medium text-gray-800 line-clamp-2 cursor-pointer"
-                              onClick={() => router.push(`/product/${item.product.product_id}`)}>
+                              onClick={() =>
+                                router.push(
+                                  `/product/${item.product.product_id}`
+                                )
+                              }
+                            >
                               {item.product.product_name}
                             </p>
                             {isOutOfStock && (
