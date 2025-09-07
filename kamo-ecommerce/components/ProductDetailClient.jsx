@@ -268,10 +268,16 @@ const ProductDetailClient = ({ initialProductData }) => {
               </SwiperSlide>
             )}
             {/* Custom Navigation Buttons */}
-            <button className="swiper-button-prev-custom absolute top-1/2 -translate-y-1/2 left-4 z-10 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition disabled:opacity-0">
+            <button
+              className="swiper-button-prev-custom absolute top-1/2 -translate-y-1/2 left-4 z-10 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition disabled:opacity-0"
+              aria-label="Gambar sebelumnya"
+            >
               <FiChevronLeft className="w-5 h-5 text-gray-700" />
             </button>
-            <button className="swiper-button-next-custom absolute top-1/2 -translate-y-1/2 right-4 z-10 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition disabled:opacity-0">
+            <button
+              className="swiper-button-next-custom absolute top-1/2 -translate-y-1/2 right-4 z-10 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition disabled:opacity-0"
+              aria-label="Gambar berikutnya"
+            >
               <FiChevronRight className="w-5 h-5 text-gray-700" />
             </button>
           </Swiper>
@@ -346,9 +352,9 @@ const ProductDetailClient = ({ initialProductData }) => {
           <div className="mb-3 p-4 bg-gray-50 rounded-lg relative">
             {productData.product_is_discount && (
               <div className="absolute top-0 left-0 text-white">
-                <div className="relative w-14 h-14 -translate-x-3 md:-translate-y-0 -translate-y-1">
+                <div className="relative w-14 h-14 -translate-x-2 md:-translate-y-0 -translate-y-0.5">
                   <LabelDiskon className="text-[#F84B62]" />
-                  <div className="absolute bottom-4 right-2 text-white inset-0 flex items-center justify-center text-[10px] md:text-xs font-bold transform -translate-y-[8%] -translate-x-1 md:-translate-y-0 md:-translate-x-0">
+                  <div className="absolute text-white inset-0 flex items-center justify-center text-[10px] md:text-xs font-bold transform md:-translate-y-2 md:-translate-x-1 -translate-y-2.5 -translate-x-2">
                     {productData.product_discount_percentage}%
                   </div>
                 </div>
@@ -380,7 +386,9 @@ const ProductDetailClient = ({ initialProductData }) => {
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-2">Deskripsi Produk</h3>
             <div
-              className="prose max-w-none text-gray-600"
+              className="prose max-w-none text-gray-600 
+                         prose-ul:list-disc prose-ol:list-decimal prose-li:ml-5
+                         prose-p:my-2"
               dangerouslySetInnerHTML={{
                 __html: productData.product_description || "",
               }}
@@ -430,6 +438,7 @@ const ProductDetailClient = ({ initialProductData }) => {
               <button
                 onClick={handleAskAdmin}
                 className="p-3 bg-accent hover:bg-accent/90 text-white rounded-lg transition flex items-center justify-center"
+                aria-label="Tanya Admin"
               >
                 <FaCommentDots className="text-lg" />
               </button>

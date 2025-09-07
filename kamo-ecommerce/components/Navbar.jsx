@@ -126,6 +126,7 @@ const Navbar = () => {
           <button
             onClick={() => setMobileSearchOpen((prev) => !prev)}
             className="p-1 z-20 cursor-pointer"
+            aria-label="Toggle search"
           >
             {mobileSearchOpen ? (
               <FaTimes className="w-5 h-5 text-gray-500" />
@@ -168,6 +169,7 @@ const Navbar = () => {
         <button
           onClick={handleShare}
           className="z-20 cursor-pointer text-gray-500 hover:text-accent"
+          aria-label="Share this page"
         >
           <Shareicon className="cursor-pointer" />
         </button>
@@ -217,6 +219,7 @@ const Navbar = () => {
             <button
               onClick={user ? userLogout : logoutAdmin}
               className="hidden lg:flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-full text-sm hover:bg-red-600"
+              aria-label="Logout"
             >
               <FaSignOutAlt />
               <span>Keluar</span>
@@ -226,6 +229,7 @@ const Navbar = () => {
           <button
             onClick={() => router.push("/account")}
             className="bg-accent text-white px-4 py-2 rounded-full text-sm hover:bg-accent/90"
+            aria-label="Login"
           >
             Masuk
           </button>
@@ -241,6 +245,7 @@ const Navbar = () => {
             setMenuOpen(false); // Tutup menu saat membuka pencarian
           }}
           className="z-20 text-gray-500"
+          aria-label="Toggle search"
         >
           {mobileSearchOpen ? (
             <FaTimes className="w-5 h-5" />
@@ -249,12 +254,12 @@ const Navbar = () => {
           )}
         </button>
         {/* Share icon */}
-        <button className="z-20 text-gray-500" onClick={handleShare}>
+        <button className="z-20 text-gray-500" onClick={handleShare} aria-label="Share this page">
           <Shareicon className="w-5 h-5 cursor-pointer" />
         </button>
         
         {/* Wishlist Icon */}
-        <button>
+        <button aria-label="Wishlist">
           {user && (
             <Link
               href="/profile?tab=wishlist"
@@ -272,7 +277,7 @@ const Navbar = () => {
             setMobileSearchOpen(false); // Tutup pencarian saat membuka menu
           }}
           className="z-20"
-          aria-label="Toggle menu text-gray-500"
+          aria-label="Toggle menu"
         >
           {menuOpen ? (
             <svg
@@ -380,6 +385,7 @@ const Navbar = () => {
               <button
                 onClick={user ? userLogout : logoutAdmin}
                 className="w-full bg-red-500 text-white flex justify-center gap-2 px-5 py-2.5 rounded-full text-base hover:bg-red-600"
+                aria-label="Logout"
               >
                 <FaSignOutAlt />
                 <span>Keluar</span>
@@ -388,6 +394,7 @@ const Navbar = () => {
               <button
                 onClick={() => router.push("/account")}
                 className="w-full bg-accent text-white flex justify-center gap-2 px-5 py-2.5 rounded-full text-base hover:bg-accent/90"
+                aria-label="Login"
               >
                 Masuk
               </button>

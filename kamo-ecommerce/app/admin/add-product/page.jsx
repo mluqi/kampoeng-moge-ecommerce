@@ -1,5 +1,11 @@
 "use client";
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { assets } from "@/assets/assets";
 import { useProduct } from "@/contexts/ProductContext";
 import { useCategory } from "@/contexts/CategoryContext";
@@ -183,6 +189,8 @@ const AddProduct = () => {
     const numericPrice = price.replace(/\./g, "");
     const numericTiktokPrice = tiktokPrice.replace(/\./g, "");
 
+    const cleanedDescription = description.replace(/<p><br><\/p>/g, "<br>");
+
     // --- START: Frontend Validation ---
     if (name.length < 25 || name.length > 255) {
       toast.error("Judul produk harus antara 25 dan 255 karakter.");
@@ -190,7 +198,9 @@ const AddProduct = () => {
       return;
     }
 
-    const plainTextDescription = description.replace(/<[^>]*>?/gm, "").trim();
+    const plainTextDescription = cleanedDescription
+      .replace(/<[^>]*>?/gm, "")
+      .trim();
     if (
       plainTextDescription.length < 60 ||
       plainTextDescription.length > 10000
@@ -241,7 +251,7 @@ const AddProduct = () => {
     try {
       const formData = new FormData();
       formData.append("name", name);
-      formData.append("description", description);
+      formData.append("description", cleanedDescription);
       formData.append("sku", sku);
       formData.append("price", numericPrice);
       formData.append("product_price_tiktok", numericTiktokPrice);
@@ -371,7 +381,14 @@ const AddProduct = () => {
                   </div>
                 </SortableContext>
               </DndContext>
-              <input type="file" ref={fileInputRef} onChange={(e) => handleFileSelect(e.target.files)} multiple accept="image/*" className="hidden" />
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={(e) => handleFileSelect(e.target.files)}
+                multiple
+                accept="image/*"
+                className="hidden"
+              />
             </div>
           </div>
 
@@ -494,7 +511,9 @@ const AddProduct = () => {
                   onChange={handleTiktokPriceChange}
                   value={tiktokPrice}
                 />
-                <p className="text-xs text-gray-500 mt-1">Kosongkan jika sama dengan harga website.</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Kosongkan jika sama dengan harga website.
+                </p>
               </div>
             </div>
 

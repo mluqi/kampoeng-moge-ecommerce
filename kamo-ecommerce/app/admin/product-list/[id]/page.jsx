@@ -1,5 +1,11 @@
 "use client";
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { useProduct } from "@/contexts/ProductContext";
 import api from "@/service/api";
 import { useCategory } from "@/contexts/CategoryContext";
@@ -333,8 +339,7 @@ const ProductDetailEdit = () => {
 
   const handleFileSelect = (selectedFiles) => {
     const validFiles = Array.from(selectedFiles).filter(
-      (file) =>
-        file.type.startsWith("image/") && file.size <= 5 * 1024 * 1024
+      (file) => file.type.startsWith("image/") && file.size <= 5 * 1024 * 1024
     );
 
     if (validFiles.length !== selectedFiles.length) {
@@ -374,11 +379,12 @@ const ProductDetailEdit = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
+    const cleanedDescription = form.description.replace(/<p><br><\/p>/g, "<br>");
+
     const formData = new FormData();
     formData.append("name", form.name);
-    formData.append("description", form.description);
+    formData.append("description", cleanedDescription);
     formData.append("sku", form.sku);
-    // Kirim harga ke backend sebagai angka tanpa titik
     formData.append("price", form.price.replace(/\./g, ""));
     formData.append(
       "product_price_tiktok",

@@ -157,7 +157,7 @@ export default function ProductFilterBar({
               >
                 <Image
                   src={slide.image}
-                  alt={slide.label}
+                  alt={`${slide.label} Image`}
                   fill
                   className="object-cover"
                   sizes="(max-width: 768px) 30vw, (max-width: 1200px) 20vw, 128px"
@@ -206,9 +206,10 @@ export default function ProductFilterBar({
             onChange={(e) => onSortChange(e.target.value)}
             className="px-3 py-2 rounded border border-gray-300 bg-white text-gray-800 
                     text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 cursor-pointer min-w-[150px]"
+            aria-label="Sort products by"
           >
             {SORT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
+              <option key={opt.value} value={opt.value} label={opt.label}>
                 {opt.label}
               </option>
             ))}

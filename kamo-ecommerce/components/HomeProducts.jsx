@@ -36,7 +36,7 @@ const HomeProducts = () => {
   const displayedProducts = products.data || [];
 
   return (
-    <div className="flex flex-col items-center pt-14">
+    <div className="flex flex-col items-center ">
       <p className="text-2xl font-medium text-left w-full">Kategori</p>
       {/* Filter Bar */}
       <div className="mt-6 w-full">

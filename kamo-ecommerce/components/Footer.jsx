@@ -105,6 +105,7 @@ const Footer = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-accent transition"
+                aria-label="Instagram"
               >
                 <FaInstagram />
               </a>
@@ -113,6 +114,7 @@ const Footer = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-accent transition"
+                aria-label="Facebook"
               >
                 <FaFacebook />
               </a>
@@ -121,6 +123,7 @@ const Footer = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-accent transition"
+                aria-label="TikTok"
               >
                 <FaTiktok />
               </a>
@@ -129,6 +132,7 @@ const Footer = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-accent transition"
+                aria-label="YouTube"
               >
                 <FaYoutube />
               </a>

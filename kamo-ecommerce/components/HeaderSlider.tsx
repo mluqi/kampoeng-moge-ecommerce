@@ -19,23 +19,27 @@ interface Slide {
 
 const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-const HeaderSlider = () => {
-  const [slides, setSlides] = useState<Slide[]>([]);
-  const [loading, setLoading] = useState(true);
+const HeaderSlider = ({ initialSlides = [] }: { initialSlides?: Slide[] }) => {
+  const [slides, setSlides] = useState<Slide[]>(initialSlides);
+  // Loading hanya true jika tidak ada data awal dari server
+  const [loading, setLoading] = useState(initialSlides.length === 0);
 
   useEffect(() => {
-    const fetchSlides = async () => {
-      try {
-        const res = await api.get("/header-slides");
-        setSlides(res.data);
-      } catch (error) {
-        console.error("Gagal memuat data slider:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSlides();
-  }, []);
+    // Fetch data di client hanya sebagai fallback jika initialSlides kosong
+    if (initialSlides.length === 0) {
+      const fetchSlides = async () => {
+        try {
+          const res = await api.get("/header-slides");
+          setSlides(res.data);
+        } catch (error) {
+          console.error("Gagal memuat data slider di client:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchSlides();
+    }
+  }, [initialSlides]);
 
   if (loading) {
     return (
@@ -48,7 +52,7 @@ const HeaderSlider = () => {
   }
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full pb-10">
       <Swiper
         modules={[Pagination, Autoplay]}
         loop={true}

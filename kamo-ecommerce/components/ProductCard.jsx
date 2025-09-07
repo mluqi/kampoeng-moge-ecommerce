@@ -102,7 +102,7 @@ const ProductCard = ({ product }) => {
         <div className="absolute top-0 left-0 z-10 text-white -translate-y-[-5%] -translate-x-2 md:-translate-y-[-5%]">
           <div className="relative w-14 h-14">
             <LabelDiskon className="text-[#F84B62]" />
-            <div className="absolute text-white inset-0 flex items-center justify-center text-[9px] md:text-xs font-bold transform -translate-y-[18%] -translate-x-2 md:-translate-y-[12%] md:-translate-x-1">
+            <div className="absolute text-white inset-0 flex items-center justify-center text-[9px] md:text-xs lg:text-xs font-bold transform -translate-y-[18%] -translate-x-2 md:-translate-y-[12%] md:-translate-x-1 lg:-translate-y-[12%] lg:-translate-x-1">
               {product.product_discount_percentage}%
             </div>
           </div>
@@ -190,6 +190,7 @@ const ProductCard = ({ product }) => {
               onClick={handleBuyNowClick}
               disabled={isOutOfStock}
               className="flex items-center gap-1 px-3 py-1.5 bg-accent text-white text-sm rounded-full hover:bg-accent/90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+              aria-label="Beli Sekarang"
             >
               <FaShoppingCart className="w-3 h-3" />
               <span className="hidden md:inline">Beli</span>

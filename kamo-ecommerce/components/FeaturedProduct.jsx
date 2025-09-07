@@ -17,23 +17,27 @@ import { assets } from "@/assets/assets";
 
 const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-const FeaturedProduct = () => {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+const FeaturedProduct = ({ initialProducts = [] }) => {
+  const [products, setProducts] = useState(initialProducts);
+  // Loading hanya true jika tidak ada data awal dari server
+  const [loading, setLoading] = useState(initialProducts.length === 0);
 
   useEffect(() => {
-    const fetchFeaturedProducts = async () => {
-      try {
-        const res = await api.get("/featured-products");
-        setProducts(res.data);
-      } catch (error) {
-        console.error("Failed to fetch featured products:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchFeaturedProducts();
-  }, []);
+    // Fetch data di client hanya sebagai fallback jika initialProducts kosong
+    if (initialProducts.length === 0) {
+      const fetchFeaturedProducts = async () => {
+        try {
+          const res = await api.get("/featured-products");
+          setProducts(res.data);
+        } catch (error) {
+          console.error("Failed to fetch featured products:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchFeaturedProducts();
+    }
+  }, [initialProducts]);
 
   // Tampilkan skeleton loading yang menarik
   if (loading) {
@@ -61,13 +65,14 @@ const FeaturedProduct = () => {
   }
 
   // Komponen Card internal untuk menghindari duplikasi kode
-  const ProductCard = ({ product }) => (
+  const ProductCard = ({ product, isFirst }) => (
     <div className="relative group aspect-[3/4] overflow-hidden rounded-lg">
       <Image
         src={baseUrl + product.image_url}
         alt={product.title}
         fill
         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+        priority={isFirst}
         onClick={() => (window.location.href = product.button_link || "#")}
         className="group-hover:brightness-75 transition duration-300 object-cover"
       />
@@ -137,25 +142,35 @@ const FeaturedProduct = () => {
             }}
             className="!pb-10"
           >
-            {products.map((product) => (
+            {products.map((product, index) => (
               <SwiperSlide key={product.id}>
-                <ProductCard product={product} />
+                <ProductCard product={product} isFirst={index === 0} />
               </SwiperSlide>
             ))}
           </Swiper>
           {/* Tombol Navigasi Kustom */}
-          <button className="swiper-button-prev-featured absolute top-1/2 -translate-y-1/2 left-0 z-10 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition disabled:opacity-0">
+          <button
+            className="swiper-button-prev-featured absolute top-1/2 -translate-y-1/2 left-0 z-10 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition disabled:opacity-0"
+            aria-label="Produk unggulan sebelumnya"
+          >
             <FiChevronLeft className="w-6 h-6 text-gray-700" />
           </button>
-          <button className="swiper-button-next-featured absolute top-1/2 -translate-y-1/2 right-0 z-10 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition disabled:opacity-0">
+          <button
+            className="swiper-button-next-featured absolute top-1/2 -translate-y-1/2 right-0 z-10 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition disabled:opacity-0"
+            aria-label="Produk unggulan berikutnya"
+          >
             <FiChevronRight className="w-6 h-6 text-gray-700" />
           </button>
         </div>
       ) : (
         // Tampilan Grid (untuk 1-3 produk)
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-14 mt-12 md:px-14 px-4">
-          {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
+          {products.map((product, index) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              isFirst={index === 0}
+            />
           ))}
         </div>
       )}
