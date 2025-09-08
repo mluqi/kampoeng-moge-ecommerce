@@ -31,6 +31,7 @@ import {
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { SortableImageItem } from "@/components/admin/SortableImageItem";
+import imageCompression from "browser-image-compression";
 
 // Import ReactQuill secara dinamis untuk menghindari masalah SSR
 const ReactQuill = dynamic(() => import("react-quill-new"), {
@@ -337,23 +338,40 @@ const ProductDetailEdit = () => {
     setActiveId(null);
   };
 
-  const handleFileSelect = (selectedFiles) => {
-    const validFiles = Array.from(selectedFiles).filter(
-      (file) => file.type.startsWith("image/") && file.size <= 5 * 1024 * 1024
+  const handleFileSelect = async (selectedFiles) => {
+    const imageFiles = Array.from(selectedFiles).filter((file) =>
+      file.type.startsWith("image/")
     );
 
-    if (validFiles.length !== selectedFiles.length) {
-      toast.error(
-        "Beberapa file tidak valid (melebihi 5MB atau bukan gambar)."
-      );
-    }
+    const compressionOptions = {
+      maxSizeMB: 1,
+      maxWidthOrHeight: 1920,
+      useWebWorker: true,
+    };
 
-    const newImageItems = validFiles.map((file) => ({
-      id: `${file.name}-${file.lastModified}`,
-      type: "new",
-      payload: file,
-    }));
+    const compressedFilesPromises = imageFiles.map(async (file) => {
+      try {
+        let finalFile = file;
+        if (file.size > 1024 * 1024) {
+          const toastId = toast.loading(`Mengompres ${file.name}...`);
+          finalFile = await imageCompression(file, compressionOptions);
+          toast.success(`${file.name} berhasil dikompres!`, { id: toastId });
+        }
+        return {
+          id: `${file.name}-${file.lastModified}`,
+          type: "new",
+          payload: finalFile,
+        };
+      } catch (error) {
+        console.error("Gagal mengompres gambar:", error);
+        toast.error(`Gagal mengompres ${file.name}`);
+        return null;
+      }
+    });
 
+    const newImageItems = (await Promise.all(compressedFilesPromises)).filter(
+      Boolean
+    );
     setImageItems((prev) => [...prev, ...newImageItems].slice(0, 9));
   };
 
@@ -379,7 +397,10 @@ const ProductDetailEdit = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const cleanedDescription = form.description.replace(/<p><br><\/p>/g, "<br>");
+    const cleanedDescription = form.description.replace(
+      /<p><br><\/p>/g,
+      "<br>"
+    );
 
     const formData = new FormData();
     formData.append("name", form.name);

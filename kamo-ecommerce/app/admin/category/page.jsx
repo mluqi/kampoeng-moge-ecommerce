@@ -20,6 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowUpDown } from "@/assets/assets";
+import imageCompression from "browser-image-compression";
 
 const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -117,6 +118,35 @@ const CategoryPage = () => {
     }
   };
 
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("File yang dipilih harus berupa gambar.");
+      return;
+    }
+
+    try {
+      let finalFile = file;
+      // Kompres jika lebih dari 1MB
+      if (file.size > 1024 * 1024) {
+        const toastId = toast.loading("Mengompres gambar...");
+        const options = {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1024, // Ukuran lebih kecil untuk ikon kategori
+          useWebWorker: true,
+        };
+        finalFile = await imageCompression(file, options);
+        toast.success("Gambar berhasil dikompres!", { id: toastId });
+      }
+      setForm({ ...form, category_image: finalFile });
+      setPreviewImage(URL.createObjectURL(finalFile));
+    } catch (error) {
+      toast.error("Gagal mengompres gambar.");
+      console.error(error);
+    }
+  };
   // --- DND-KIT LOGIC ---
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -253,17 +283,7 @@ const CategoryPage = () => {
                     type="file"
                     accept="image/*"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-accent focus:border-accent"
-                    onChange={(e) => {
-                      const file = e.target.files[0];
-                      if (file) {
-                        setForm({ ...form, category_image: file });
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setPreviewImage(reader.result);
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
+                    onChange={handleImageChange}
                   />
                 </div>
 
@@ -273,7 +293,8 @@ const CategoryPage = () => {
                       width={100}
                       height={100}
                       src={
-                        previewImage.startsWith("data:")
+                        previewImage.startsWith("data:") ||
+                        previewImage.startsWith("blob:")
                           ? previewImage
                           : baseUrl + previewImage
                       }

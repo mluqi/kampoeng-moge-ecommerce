@@ -12,7 +12,7 @@ import {
   FaSearch,
   FaSignOutAlt,
   FaShoppingCart,
-  FaTimes,
+  FaTimes
 } from "react-icons/fa";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "react-hot-toast";

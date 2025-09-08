@@ -8,7 +8,7 @@ import { notFound } from "next/navigation";
 const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-export const dynamic = "force-dynamic"; 
+export const dynamic = "force-dynamic";
 
 // Helper function to clean HTML for metadata
 function stripHtmlAndTruncate(html, length) {
@@ -46,7 +46,9 @@ export async function generateMetadata({ params }) {
     };
   }
 
-  const title = `${product.product_name} | KAMO Store`;
+  const title = `${
+    product.product_name.length > 60 ? product.product_name.substring(0, 50) + "..." : product.product_name
+  } | KAMO`;
   const description = stripHtmlAndTruncate(product.product_description, 160);
   const imageUrl = product.product_pictures?.[0]
     ? baseUrl + product.product_pictures[0]
@@ -62,7 +64,7 @@ export async function generateMetadata({ params }) {
       title,
       description,
       url: `${siteUrl}/product/${id}`,
-      siteName: "KAMO Store",
+      siteName: "KAMO",
       images: [
         {
           url: imageUrl,

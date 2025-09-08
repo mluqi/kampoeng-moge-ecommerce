@@ -28,6 +28,7 @@ import {
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { SortableImageItem } from "@/components/admin/SortableImageItem";
+import imageCompression from "browser-image-compression";
 
 // Import ReactQuill secara dinamis untuk menghindari masalah SSR
 const ReactQuill = dynamic(() => import("react-quill-new"), {
@@ -173,12 +174,46 @@ const AddProduct = () => {
     setActiveId(null);
   };
 
-  const handleFileSelect = (selectedFiles) => {
-    const newFiles = Array.from(selectedFiles).map((file) => ({
-      id: `${file.name}-${file.lastModified}`, // ID unik
-      file,
-    }));
-    setFiles((prev) => [...prev, ...newFiles].slice(0, 9)); // Batasi hingga 9 gambar
+  const handleFileSelect = async (selectedFiles) => {
+    const imageFiles = Array.from(selectedFiles).filter((file) =>
+      file.type.startsWith("image/")
+    );
+
+    const compressionOptions = {
+      maxSizeMB: 1, // Kompres jika file lebih besar dari 1MB
+      maxWidthOrHeight: 1920, // Batas resolusi, bagus untuk gambar produk
+      useWebWorker: true, // Gunakan Web Worker untuk performa
+    };
+
+    const compressedFilesPromises = imageFiles.map(async (file) => {
+      try {
+        // Hanya kompres jika ukuran file > 1MB
+        if (file.size > 1024 * 1024) {
+          const toastId = toast.loading(`Mengompres ${file.name}...`);
+          const compressedFile = await imageCompression(
+            file,
+            compressionOptions
+          );
+          toast.success(`${file.name} berhasil dikompres!`, { id: toastId });
+          return {
+            id: `${file.name}-${file.lastModified}`,
+            file: compressedFile,
+          };
+        }
+        // Jika di bawah 1MB, langsung gunakan file asli
+        return { id: `${file.name}-${file.lastModified}`, file: file };
+      } catch (error) {
+        console.error("Gagal mengompres gambar:", error);
+        toast.error(`Gagal mengompres ${file.name}`);
+        return null; // Kembalikan null jika gagal
+      }
+    });
+
+    // Tunggu semua proses kompresi selesai dan filter yang gagal
+    const newFiles = (await Promise.all(compressedFilesPromises)).filter(
+      Boolean
+    );
+    setFiles((prev) => [...prev, ...newFiles].slice(0, 9));
   };
 
   // Preserved the handleSubmit function with added loading state

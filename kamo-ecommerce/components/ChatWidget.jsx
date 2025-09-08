@@ -15,6 +15,8 @@ import { assets } from "@/assets/assets";
 import ProductInfoCard from "@/components/ProductInfoCard";
 import ImagePreviewModal from "@/components/ImagePreviewModal";
 import { AnimatePresence, motion } from "framer-motion";
+import imageCompression from "browser-image-compression";
+import toast from "react-hot-toast";
 
 const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -62,11 +64,32 @@ const ChatWidget = () => {
     }
   };
 
-  const handleImageChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      // Anda bisa menambahkan validasi ukuran atau tipe file di sini
-      setImageToSend(file);
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("File yang dipilih harus berupa gambar.");
+      return;
+    }
+
+    try {
+      let finalFile = file;
+      // Kompres jika lebih dari 1MB
+      if (file.size > 1024 * 1024) {
+        const toastId = toast.loading("Mengompres gambar...");
+        const options = {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+        };
+        finalFile = await imageCompression(file, options);
+        // toast.success("Gambar berhasil dikompres!", { id: toastId });
+      }
+      setImageToSend(finalFile);
+    } catch (error) {
+      toast.error("Gagal mengompres gambar.");
+      console.error(error);
     }
   };
 
