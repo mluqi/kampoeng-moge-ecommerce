@@ -7,17 +7,19 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// [BARU] Map mimetypes ke ekstensi file untuk validasi dan penamaan yang andal.
+const mimeToExt = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/jpg": ".jpg",
+};
+
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png/;
-  const ext = path.extname(file.originalname).toLowerCase();
-  const mime = file.mimetype;
-  if (
-    allowedTypes.test(ext.replace(".", "")) &&
-    (mime === "image/jpeg" || mime === "image/png" || mime === "image/jpg")
-  ) {
+  // [DIUBAH] Validasi berdasarkan mimetype untuk keandalan, karena originalname bisa saja 'blob'.
+  if (mimeToExt[file.mimetype]) {
     cb(null, true);
   } else {
-    cb(new Error("Only .jpg, .jpeg, .png files are allowed!"));
+    cb(new Error("Only .jpg, .jpeg, .png files are allowed!"), false);
   }
 };
 
@@ -26,11 +28,11 @@ const diskStorage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
+    // [DIUBAH] Tentukan ekstensi file dari mimetype secara andal.
+    const ext = mimeToExt[file.mimetype] || path.extname(file.originalname);
     cb(
       null,
-      `${file.fieldname}-${Date.now()}-${Math.round(
-        Math.random() * 1e9
-      )}${path.extname(file.originalname)}`
+      `${file.fieldname}-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`
     );
   },
 });
