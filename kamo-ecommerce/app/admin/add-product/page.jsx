@@ -29,6 +29,7 @@ import {
 } from "@dnd-kit/sortable";
 import { SortableImageItem } from "@/components/admin/SortableImageItem";
 import imageCompression from "browser-image-compression";
+import ConfirmationModal from "@/components/admin/ConfirmationModal";
 
 // Import ReactQuill secara dinamis untuk menghindari masalah SSR
 const ReactQuill = dynamic(() => import("react-quill-new"), {
@@ -75,6 +76,14 @@ const AddProduct = () => {
   const [tiktokCategoryId, setTiktokCategoryId] = useState("");
   const [tiktokProductAttributes, setTiktokProductAttributes] = useState([]);
   const [descriptionLength, setDescriptionLength] = useState(0);
+
+  // State for confirmation modal
+  const [confirmationModal, setConfirmationModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
   // 3. Buat callback untuk menerima data dari komponen ProductTiktokSection
   const handleTiktokDataChange = useCallback(
@@ -346,6 +355,18 @@ const AddProduct = () => {
     }
   };
 
+  const confirmAndSubmit = (e) => {
+    e.preventDefault();
+    setConfirmationModal({
+      isOpen: true,
+      title: "Konfirmasi Tambah Produk",
+      message: "Apakah Anda yakin ingin menambahkan produk baru ini?",
+      onConfirm: () => handleSubmit(e),
+      isDestructive: false,
+      confirmText: "Ya, Tambahkan",
+    });
+  };
+
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -362,12 +383,23 @@ const AddProduct = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        onClose={() =>
+          setConfirmationModal({ ...confirmationModal, isOpen: false })
+        }
+        onConfirm={confirmationModal.onConfirm}
+        title={confirmationModal.title}
+        message={confirmationModal.message}
+        isDestructive={confirmationModal.isDestructive}
+        confirmText={confirmationModal.confirmText}
+      />
       <div className="max-w-8xl mx-auto bg-white rounded-lg shadow-sm p-6">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">
           Tambah Produk Baru
         </h1>
 
-        <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+        <form onSubmit={confirmAndSubmit} className="space-y-6" noValidate>
           {/* Image Upload Section */}
           <div>
             <h2 className="text-lg font-medium text-gray-700 mb-3">

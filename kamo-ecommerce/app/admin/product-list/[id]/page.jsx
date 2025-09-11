@@ -32,6 +32,7 @@ import {
 } from "@dnd-kit/sortable";
 import { SortableImageItem } from "@/components/admin/SortableImageItem";
 import imageCompression from "browser-image-compression";
+import ConfirmationModal from "@/components/admin/ConfirmationModal";
 
 // Import ReactQuill secara dinamis untuk menghindari masalah SSR
 const ReactQuill = dynamic(() => import("react-quill-new"), {
@@ -88,6 +89,14 @@ const ProductDetailEdit = () => {
   const [tiktokCategoryId, setTiktokCategoryId] = useState("");
   const [tiktokProductAttributes, setTiktokProductAttributes] = useState([]);
   const [initialTiktokAttributes, setInitialTiktokAttributes] = useState({});
+
+  // State for confirmation modal
+  const [confirmationModal, setConfirmationModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
   // Format harga dengan titik ribuan saat input, tapi kirim ke backend tetap angka
   const formatNumber = (value) => {
@@ -243,6 +252,7 @@ const ProductDetailEdit = () => {
   }, [id, fetchProductById]);
 
   // Konfigurasi ReactQuill
+  // Konfigurasi untuk editor teks ReactQuill
   const modules = useMemo(
     () => ({
       toolbar: {
@@ -379,6 +389,18 @@ const ProductDetailEdit = () => {
     setImageItems((prev) => prev.filter((item) => item.id !== idToRemove));
   };
 
+  const handleRemoveImageWithConfirmation = (idToRemove) => {
+    setConfirmationModal({
+      isOpen: true,
+      title: "Konfirmasi Hapus Gambar",
+      message:
+        "Apakah Anda yakin ingin menghapus gambar ini? Tindakan ini tidak dapat dibatalkan.",
+      onConfirm: () => handleRemoveImage(idToRemove),
+      isDestructive: true,
+      confirmText: "Hapus",
+    });
+  };
+
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -467,6 +489,19 @@ const ProductDetailEdit = () => {
     }
   };
 
+  const confirmAndSubmit = (e) => {
+    e.preventDefault();
+    setConfirmationModal({
+      isOpen: true,
+      title: "Konfirmasi Simpan",
+      message:
+        "Apakah Anda yakin ingin menyimpan semua perubahan pada produk ini?",
+      onConfirm: () => handleSubmit(e),
+      isDestructive: false,
+      confirmText: "Simpan",
+    });
+  };
+
   if (loading) {
     return (
       <div className="p-8 space-y-4 animate-pulse">
@@ -505,6 +540,17 @@ const ProductDetailEdit = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        onClose={() =>
+          setConfirmationModal({ ...confirmationModal, isOpen: false })
+        }
+        onConfirm={confirmationModal.onConfirm}
+        title={confirmationModal.title}
+        message={confirmationModal.message}
+        isDestructive={confirmationModal.isDestructive}
+        confirmText={confirmationModal.confirmText}
+      />
       <div className="max-w-8xl mx-auto bg-white rounded-xl shadow-sm overflow-hidden">
         {!editMode ? (
           <>
@@ -547,7 +593,11 @@ const ProductDetailEdit = () => {
                       {imageItems.map((item, idx) => (
                         <div key={idx} className="relative aspect-square">
                           <Image
-                            src={baseUrl + item.payload}
+                            src={
+                              item.type === "new"
+                                ? URL.createObjectURL(item.payload)
+                                : baseUrl + item.payload
+                            }
                             alt={`product-${idx}`}
                             fill
                             className="rounded-lg object-cover border"
@@ -703,7 +753,7 @@ const ProductDetailEdit = () => {
             </div>
           </>
         ) : (
-          <form onSubmit={handleSubmit} className="divide-y">
+          <form onSubmit={confirmAndSubmit} className="divide-y">
             {/* Header */}
             <div className="p-6 flex justify-between items-center">
               <div>
@@ -716,9 +766,25 @@ const ProductDetailEdit = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    setEditMode(false);
-                    setNewFiles([]);
-                    setMarkedForRemoval([]);
+                    setConfirmationModal({
+                      isOpen: true,
+                      title: "Konfirmasi Batal",
+                      message:
+                        "Anda yakin ingin membatalkan perubahan? Semua yang belum disimpan akan hilang.",
+                      onConfirm: () => {
+                        setEditMode(false);
+                        const initialImages = (
+                          product.product_pictures || []
+                        ).map((url) => ({
+                          id: url,
+                          type: "existing",
+                          payload: url,
+                        }));
+                        setImageItems(initialImages);
+                      },
+                      isDestructive: true,
+                      confirmText: "Ya, Batalkan",
+                    });
                   }}
                   className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
                 >
@@ -771,7 +837,9 @@ const ProductDetailEdit = () => {
                                   ? URL.createObjectURL(item.payload)
                                   : baseUrl + item.payload
                               }
-                              onRemove={() => handleRemoveImage(item.id)}
+                              onRemove={() =>
+                                handleRemoveImageWithConfirmation(item.id)
+                              }
                             />
                           ))}
                           {canAddMoreImages && (

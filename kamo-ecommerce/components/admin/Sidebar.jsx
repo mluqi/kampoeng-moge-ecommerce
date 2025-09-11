@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useOrderNotification } from "@/contexts/OrderNotificationContext";
 import { useAdminChat } from "@/contexts/AdminChatContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAppContext } from "@/contexts/AppContext";
@@ -22,8 +23,7 @@ import {
   FaChevronLeft,
   FaTimes,
   FaSignOutAlt,
-  FaTag
-  
+  FaTag,
 } from "react-icons/fa";
 import { BiSolidBookContent } from "react-icons/bi";
 const SideBar = ({
@@ -34,6 +34,7 @@ const SideBar = ({
 }) => {
   const pathname = usePathname();
   const { totalUnreadCount } = useAdminChat();
+  const { processingOrdersCount } = useOrderNotification();
   const { logoutAdmin } = useAuth();
   const { router } = useAppContext();
 
@@ -202,9 +203,18 @@ const SideBar = ({
                       >
                         {item.name}
                       </p>
-                      {item.name === "Chat" && totalUnreadCount > 0 && (
+                      {item.name === "Pesanan" && processingOrdersCount > 0 && (
                         <span
-                          className={`ml-auto bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center ${
+                          className={`ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center ${
+                            !isExpanded && "md:hidden"
+                          }`}
+                        >
+                          {processingOrdersCount}
+                        </span>
+                      )}
+                      {item.name === "Pesan" && totalUnreadCount > 0 && (
+                        <span
+                          className={`ml-auto bg-red-500 text-white text-[10%] font-bold rounded-full h-5 w-5 flex items-center justify-center ${
                             !isExpanded && "md:hidden"
                           }`}
                         >

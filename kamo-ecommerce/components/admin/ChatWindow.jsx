@@ -78,7 +78,7 @@ const ChatWindow = ({
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || isSending) return;
+    if ((!newMessage.trim() && !imageToSend) || isSending) return;
 
     setIsSending(true);
     const messageData = { content: newMessage, image: imageToSend };
@@ -471,11 +471,11 @@ const ChatWindow = ({
           <button
             type="submit"
             className={`w-11 h-11 rounded-full flex items-center justify-center shadow-md transition-all ${
-              newMessage.trim() && !isSending
+              (newMessage.trim() || imageToSend) && !isSending
                 ? "bg-accent text-white hover:bg-accent/90 transform hover:scale-105"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }`}
-            disabled={!newMessage.trim() || isSending}
+            disabled={(!newMessage.trim() && !imageToSend) || isSending}
           >
             {isSending ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>

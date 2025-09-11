@@ -48,28 +48,31 @@ const Footer = () => {
             <h2 className="font-medium text-gray-900 mb-5">KampoengMoge</h2>
             <ul className="text-sm space-y-2">
               <li>
-                <a className="hover:underline transition" href="/">
+                <a className="hover:text-accent transition" href="/">
                   Beranda
                 </a>
               </li>
               <li>
-                <a className="hover:underline transition" href="/all-products">
+                <a
+                  className="hover:text-accent transition"
+                  href="/all-products"
+                >
                   Belanja
                 </a>
               </li>
               <li>
-                <a className="hover:underline transition" href="/about-us">
+                <a className="hover:text-accent transition" href="/about-us">
                   Tentang Kami
                 </a>
               </li>
               <li>
-                <a className="hover:underline transition" href="/contact">
+                <a className="hover:text-accent transition" href="/contact">
                   Kontak
                 </a>
               </li>
               <li>
                 <a
-                  className="hover:underline transition"
+                  className="hover:text-accent transition"
                   href="/terms-and-conditions"
                 >
                   Syarat dan Ketentuan
@@ -77,7 +80,7 @@ const Footer = () => {
               </li>
               <li>
                 <a
-                  className="hover:underline transition"
+                  className="hover:text-accent transition"
                   href="/privacy-policy"
                 >
                   Kebijakan Privasi

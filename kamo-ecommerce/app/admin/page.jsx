@@ -250,7 +250,6 @@ const Dashboard = () => {
           title="Pengguna Baru (Hari Ini)"
           value={stats.newUsersToday}
           color="border-purple-500"
-          onClick={() => router.push("/admin/users")}
         />
         <StatCard
           icon={<FaBoxes className="text-orange-500" />}
@@ -264,7 +263,6 @@ const Dashboard = () => {
           title="Total Pelanggan"
           value={stats.totalCustomers}
           color="border-teal-500"
-          onClick={() => router.push("/admin/users")}
         />
       </div>
 

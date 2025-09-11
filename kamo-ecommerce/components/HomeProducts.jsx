@@ -37,8 +37,16 @@ const HomeProducts = () => {
 
   return (
     <div className="flex flex-col items-center ">
-      <p className="text-2xl font-medium text-left w-full">Kategori</p>
-      {/* Filter Bar */}
+      <div className="flex justify-between items-center w-full">
+        <p className="text-2xl font-medium text-left">Kategori</p>
+        <button
+          onClick={() => router.push("/category")}
+          className=" py-2 rounded-lg text-gray-700 hover:text-accent transition flex items-center gap-1 text-sm hidden md:flex cursor-pointer"
+        >
+          Lihat Semua Kategori <FiChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+      {/* Filter Bar */} 
       <div className="mt-6 w-full">
         <ProductFilterBar
           categories={categories}

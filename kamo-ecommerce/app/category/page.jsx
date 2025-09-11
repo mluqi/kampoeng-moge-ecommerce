@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useCategory } from "@/contexts/CategoryContext";
@@ -13,12 +13,18 @@ const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 const CategoriesPage = () => {
   const { categories, loading, fetchCategories } = useCategory();
   const router = useRouter();
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     if (categories.length === 0) {
       fetchCategories();
     }
   }, [fetchCategories, categories.length]);
+
+  // Filter categories based on search term
+  const filteredCategories = categories.filter((cat) =>
+    cat.category_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <>
@@ -31,15 +37,26 @@ const CategoriesPage = () => {
           <div className="w-24 h-1 bg-accent rounded-full mb-8"></div>
         </div>
 
+        {/* Search Bar */}
+        <div className="w-full max-w-7xl mx-auto mb-8">
+          <input
+            type="text"
+            placeholder="Cari kategori..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full md:w-1/2 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+        </div>
+
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <Loading />
           </div>
-        ) : (
+        ) : filteredCategories.length > 0 ? (
           <>
             {/* Mobile List View */}
             <div className="flex flex-col space-y-4 md:hidden">
-              {categories.map((cat) => (
+              {filteredCategories.map((cat) => (
                 <div
                   key={cat.category_id}
                   onClick={() => router.push(`/category/${cat.category_id}`)}
@@ -72,7 +89,7 @@ const CategoriesPage = () => {
 
             {/* Desktop Grid View */}
             <div className="hidden md:grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5 max-w-7xl mx-auto">
-              {categories.map((cat) => (
+              {filteredCategories.map((cat) => (
                 <div
                   key={cat.category_id}
                   onClick={() => router.push(`/category/${cat.category_id}`)}
@@ -107,6 +124,10 @@ const CategoriesPage = () => {
               ))}
             </div>
           </>
+        ) : (
+          <div className="text-center py-16 w-full">
+            <p className="text-gray-500">Kategori tidak ditemukan.</p>
+          </div>
         )}
       </div>
       <Footer />

@@ -21,7 +21,7 @@ const ProductList = () => {
   const [editingCell, setEditingCell] = useState({ rowId: null, field: null });
   const [editValue, setEditValue] = useState("");
   const [tiktokStatuses, setTiktokStatuses] = useState({});
-  
+
   const { categories, fetchCategories } = useCategory();
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -344,7 +344,7 @@ const ProductList = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status Tiktok
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Preview
                   </th>
                 </tr>
@@ -449,7 +449,7 @@ const ProductList = () => {
                             onDoubleClick={() =>
                               handleDoubleClick(product, "price")
                             }
-                            className="text-sm text-gray-900 font-medium p-1 rounded-md cursor-pointer hover:bg-gray-100"
+                            className="min-w-28 text-sm text-gray-900 font-medium px-2 py-1 border border-transparent rounded-md cursor-pointer hover:bg-gray-100"
                             title="Double-click untuk edit"
                           >
                             Rp{" "}
@@ -476,7 +476,7 @@ const ProductList = () => {
                             onDoubleClick={() =>
                               handleDoubleClick(product, "product_price_tiktok")
                             }
-                            className="text-sm text-gray-900 font-medium p-1 rounded-md cursor-pointer hover:bg-gray-100"
+                            className="min-w-28 text-sm text-gray-900 font-medium px-2 py-1 border border-transparent rounded-md cursor-pointer hover:bg-gray-100"
                             title="Double-click untuk edit"
                           >
                             Rp{" "}
@@ -496,14 +496,14 @@ const ProductList = () => {
                             onBlur={handleSave}
                             onKeyDown={handleKeyDown}
                             autoFocus
-                            className="w-20 px-2 py-1 border border-accent rounded-md text-sm"
+                            className="w-10 px-2 py-1 border border-accent rounded-md text-sm"
                           />
                         ) : (
                           <div
                             onDoubleClick={() =>
                               handleDoubleClick(product, "stock")
                             }
-                            className="text-sm text-gray-900 p-1 rounded-md cursor-pointer hover:bg-gray-100"
+                            className="min-w-10 text-sm text-gray-900 px-2 py-1 border border-transparent rounded-md cursor-pointer hover:bg-gray-100"
                             title="Double-click untuk edit"
                           >
                             {product.product_stock ?? 0}
@@ -569,9 +569,7 @@ const ProductList = () => {
                         <div className="flex items-center justify-end">
                           <button
                             onClick={() =>
-                              router.push(
-                                `/product/${product.product_id}`
-                              )
+                              router.push(`/product/${product.product_id}`)
                             }
                             className="text-gray-600 hover:text-gray-900 cursor-pointer"
                             title="Preview Produk"

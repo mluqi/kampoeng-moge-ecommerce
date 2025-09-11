@@ -111,7 +111,7 @@ export default function ProductFilterBar({
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md 
                            focus:outline-none focus:ring-1 focus:ring-gray-400"
-                autoFocus
+                // autoFocus
               />
             </div>
 

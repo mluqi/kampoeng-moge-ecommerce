@@ -3,8 +3,8 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/contexts/CartContext";
-import { FaHome, FaStore, FaThList, FaShoppingCart } from "react-icons/fa";
-import { CategoryIcon } from "@/assets/assets";
+import { FaHome, FaStore, FaThList, FaShoppingCart, FaTags } from "react-icons/fa";
+import { CategoryIcon, IconDiskon } from "@/assets/assets";
 
 const MobileBottomNav = () => {
   const pathname = usePathname();
@@ -13,6 +13,7 @@ const MobileBottomNav = () => {
   const navItems = [
     { href: "/", label: "Home", icon: <FaHome size={20} /> },
     { href: "/all-products", label: "Produk", icon: <FaStore size={20} /> },
+    { href: "/discount", label: "Diskon", icon: <IconDiskon /> },
     { href: "/category", label: "Kategori", icon: <CategoryIcon /> },
     {
       href: "/cart",

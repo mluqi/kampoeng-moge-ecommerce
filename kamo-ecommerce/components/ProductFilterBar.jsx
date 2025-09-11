@@ -38,13 +38,6 @@ export default function ProductFilterBar({
           ? baseUrl + cat.category_image
           : "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=800&q=80",
       })),
-      {
-        id: "other",
-        type: "other",
-        label: "Other",
-        image:
-          "https://images.unsplash.com/photo-1511556820780-d912e42b4980?auto=format&fit=crop&w=800&q=80",
-      },
     ],
     [categories]
   );
