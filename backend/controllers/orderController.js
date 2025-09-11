@@ -853,3 +853,15 @@ exports.rejectCancelOrder = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+exports.getProcessingOrdersCount = async (req, res) => {
+  try {
+    const count = await Order.count({
+      where: { status: "processing" },
+    });
+    res.status(200).json({ count });
+  } catch (error) {
+    console.error("Error getting processing orders count:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};

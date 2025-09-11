@@ -168,6 +168,7 @@ exports.getAllProductsWithoutOutOfStock = async (req, res) => {
       search,
       status,
       sort = "newest",
+      isDiscounted,
     } = req.query;
 
     const pageNum = parseInt(page, 10);
@@ -177,6 +178,26 @@ exports.getAllProductsWithoutOutOfStock = async (req, res) => {
     let whereClause = {};
 
     whereClause.product_stock = { [Op.gt]: 0 };
+
+    if (isDiscounted === "true") {
+      whereClause.product_is_discount = true;
+      whereClause.product_discount_status = true;
+      const now = new Date();
+      whereClause[Op.and] = (whereClause[Op.and] || []).concat([
+        {
+          [Op.or]: [
+            { product_discount_start_date: { [Op.is]: null } },
+            { product_discount_start_date: { [Op.lte]: now } },
+          ],
+        },
+        {
+          [Op.or]: [
+            { product_discount_end_date: { [Op.is]: null } },
+            { product_discount_end_date: { [Op.gte]: now } },
+          ],
+        },
+      ]);
+    }
 
     if (brand) {
       console.log("Filtering by brand:", brand);

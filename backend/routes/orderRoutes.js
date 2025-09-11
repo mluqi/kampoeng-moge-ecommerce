@@ -13,6 +13,7 @@ const {
   rejectCancelOrder,
   getTiktokOrders,
   getTiktokOrderById,
+  getProcessingOrdersCount,
 } = require("../controllers/orderController");
 
 // --- USER ROUTES ---
@@ -23,6 +24,11 @@ router.put("/:id/cancel", cancelOrder);
 
 // --- ADMIN ROUTES ---
 router.get("/admin/all", authMiddleware, getAllOrdersAdmin);
+router.get(
+  "/admin/processing-count",
+  authMiddleware,
+  getProcessingOrdersCount
+);
 router.get("/admin/:id", authMiddleware, getOrderByIdAdmin);
 router.put("/admin/:id/status", authMiddleware, updateOrderStatus);
 

@@ -97,10 +97,10 @@ exports.sendMessageAdmin = async (req, res) => {
 
     const { conversationId, content, product_id } = req.body;
 
-    if (!content || !conversationId) {
+    if ((!content && !req.file) || !conversationId) {
       return res
         .status(400)
-        .json({ message: "Konten dan ID percakapan diperlukan." });
+        .json({ message: "Konten atau gambar dan ID percakapan diperlukan." });
     }
 
     const conversation = await Conversation.findByPk(conversationId, {
@@ -184,10 +184,10 @@ exports.sendMessage = async (req, res) => {
 
     const { conversationId, content, product_id } = req.body;
 
-    if (!content || !conversationId) {
+    if ((!content && !req.file) || !conversationId) {
       return res
         .status(400)
-        .json({ message: "Konten dan ID percakapan diperlukan." });
+        .json({ message: "Konten atau gambar dan ID percakapan diperlukan." });
     }
 
     const conversation = await Conversation.findByPk(conversationId, {
