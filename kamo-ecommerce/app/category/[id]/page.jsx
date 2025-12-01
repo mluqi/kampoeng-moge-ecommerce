@@ -65,6 +65,11 @@ const CategoryProductPage = () => {
     }
   }, [categoryId, currentPage, selectedSort, fetchPublicProducts]);
 
+  // Scroll ke atas setiap kali halaman berubah
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentPage]);
+
   const displayedProducts = products.data || [];
   const totalPages = products.totalPages || 1;
 

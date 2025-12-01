@@ -38,6 +38,11 @@ const nextConfig = {
         hostname: "p16-oec-va.ibyteimg.com",
         pathname: "**",
       },
+      {
+        protocol: "https",
+        hostname: "kampoengmoge.com",
+        pathname: "**",
+      },
     ],
   },
 };

@@ -42,6 +42,11 @@ const BrandPage = () => {
     }
   }, [decodedBrandName, page, fetchPublicProducts, selectedSort]);
 
+  // Scroll ke atas setiap kali halaman berubah
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [page]);
+
   const displayedProducts = products.data || [];
   const totalPages = products.totalPages || 1;
   const currentPage = products.currentPage || 1;

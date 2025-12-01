@@ -52,6 +52,7 @@ const ProductDetailEdit = () => {
   const fileInputRef = useRef(null);
 
   const [product, setProduct] = useState(null);
+  const [initialState, setInitialState] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,7 +60,6 @@ const ProductDetailEdit = () => {
   // Form state
   const [form, setForm] = useState({
     name: "",
-    description: "",
     sku: "",
     price: "",
     product_price_tiktok: "",
@@ -72,6 +72,8 @@ const ProductDetailEdit = () => {
     annotations: "",
     brand: "",
   });
+  const [description, setDescription] = useState("");
+  const isQuillInitialized = useRef(false);
 
   // State for sortable images
   const [imageItems, setImageItems] = useState([]);
@@ -89,6 +91,9 @@ const ProductDetailEdit = () => {
   const [tiktokCategoryId, setTiktokCategoryId] = useState("");
   const [tiktokProductAttributes, setTiktokProductAttributes] = useState([]);
   const [initialTiktokAttributes, setInitialTiktokAttributes] = useState({});
+  const [listingPlatforms, setListingPlatforms] = useState([]);
+
+  const isInitialMount = useRef(true);
 
   // State for confirmation modal
   const [confirmationModal, setConfirmationModal] = useState({
@@ -121,6 +126,21 @@ const ProductDetailEdit = () => {
       product_price_tiktok: formatNumber(raw),
     }));
   };
+
+  // Buat versi sederhana dari atribut TikTok saat ini untuk perbandingan
+  const currentSimpleTiktokAttributes = useMemo(() => {
+    if (!Array.isArray(tiktokProductAttributes)) return {};
+    return tiktokProductAttributes.reduce((acc, attr) => {
+      const firstValue = attr.values?.[0];
+      if (firstValue) {
+        acc[attr.id] = {
+          id: firstValue.id,
+          name: firstValue.name,
+        };
+      }
+      return acc;
+    }, {});
+  }, [tiktokProductAttributes]);
 
   useEffect(() => {
     let isMounted = true;
@@ -166,10 +186,14 @@ const ProductDetailEdit = () => {
         if (fetched.product_categories_tiktok) {
           setTiktokCategoryId(fetched.product_categories_tiktok);
         }
+        let initialSimpleAttrs = {}; // Ganti nama variabel untuk kejelasan
         if (fetched.product_attributes_tiktok) {
           try {
             const parsedAttributes = fetched.product_attributes_tiktok;
-            const initialAttrs = parsedAttributes.reduce((acc, attr) => {
+            setTiktokProductAttributes(parsedAttributes); // Set state live dengan data array dari server
+
+            // Buat versi objek sederhana untuk perbandingan dan prop anak
+            initialSimpleAttrs = parsedAttributes.reduce((acc, attr) => {
               const firstValue = attr.values?.[0];
               if (firstValue) {
                 acc[attr.id] = {
@@ -180,16 +204,21 @@ const ProductDetailEdit = () => {
               return acc;
             }, {});
 
-            setInitialTiktokAttributes(initialAttrs);
+            setInitialTiktokAttributes(initialSimpleAttrs);
           } catch (e) {
             console.error("Gagal mem-parsing atribut TikTok:", e);
           }
         }
 
-        setDimensionValues(dimensionData);
-        setForm({
+        const initialPlatforms = fetched.product_listing_platforms
+          ? JSON.parse(fetched.product_listing_platforms)
+          : ["TOKOPEDIA"]; // Default fallback for older products
+        setListingPlatforms(initialPlatforms);
+
+        const initialDescription = fetched.product_description || "";
+
+        const initialFormState = {
           name: fetched.product_name || "",
-          description: fetched.product_description || "",
           sku: fetched.product_sku || "",
           price: formatNumber(fetched.product_price),
           product_price_tiktok: formatNumber(
@@ -200,10 +229,30 @@ const ProductDetailEdit = () => {
           status: fetched.product_status || "active",
           category: fetched.product_category || "",
           weight: fetched.product_weight || "",
-          dimension: JSON.stringify(dimensionData),
+          dimension: JSON.stringify(dimensionData), // dimensionData sudah diparsing di atas
           annotations: fetched.product_annotations || "",
           brand: fetched.product_brand || "",
-        });
+        };
+
+        setDimensionValues(dimensionData);
+        setForm(initialFormState);
+        setDescription(initialDescription);
+
+        const finalInitialState = {
+          form: initialFormState,
+          imageItems: initialImages,
+          description: initialDescription,
+          tiktokCategoryId: fetched.product_categories_tiktok || "",
+          tiktokProductAttributes: initialSimpleAttrs, // Simpan versi objek sederhana untuk perbandingan
+          listingPlatforms: initialPlatforms,
+        };
+
+        setInitialState(finalInitialState);
+        isQuillInitialized.current = false; // Reset flag saat data baru dimuat
+
+        // --- TAMBAHKAN DEBUGGING DI SINI ---
+        // console.log("✅ State awal berhasil disimpan:", finalInitialState);
+
         setLoading(false);
       }
     };
@@ -214,7 +263,113 @@ const ProductDetailEdit = () => {
     return () => {
       isMounted = false;
     };
-  }, [id, categories.length]);
+  }, [id, categories.length, fetchCategories]);
+
+  const handleQuillChange = (value) => {
+    // Saat ReactQuill pertama kali memuat dan membersihkan HTML,
+    // kita sinkronkan initialState agar cocok dengan nilai bersih tersebut.
+    // Ini mencegah deteksi perubahan palsu saat pertama kali load.
+    if (
+      initialState &&
+      !isQuillInitialized.current &&
+      value !== initialState.description
+    ) {
+      setInitialState((prev) => ({
+        ...prev,
+        description: value,
+      }));
+      isQuillInitialized.current = true;
+    }
+    setDescription(value);
+  };
+
+  // Komponen kecil untuk menampilkan state di UI
+  const DebugState = ({ data, title = "Debug State" }) => {
+    // Jangan tampilkan di production
+    if (process.env.NODE_ENV !== "development") {
+      return null;
+    }
+
+    return (
+      <div className="mt-8 p-4 bg-gray-900 text-white rounded-lg shadow-xl">
+        <h3 className="text-lg font-bold text-yellow-400 mb-2">{title}</h3>
+        <pre className="text-sm overflow-x-auto">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      </div>
+    );
+  };
+
+  const hasChanges = useMemo(() => {
+    // Jika state awal belum siap, anggap tidak ada perubahan
+    if (!initialState) {
+      return false;
+    }
+
+    // 1. Bandingkan form utama
+    const formChanged =
+      JSON.stringify(initialState.form) !== JSON.stringify(form);
+
+    // 2. Bandingkan deskripsi secara terpisah
+    const descriptionChanged = initialState.description !== description;
+
+    // 2. Bandingkan urutan dan jumlah gambar
+    // Cara sederhana: bandingkan ID gambar dalam urutan yang benar
+    const initialImageIds = initialState.imageItems
+      .map((item) => item.id)
+      .join(",");
+    const currentImageIds = imageItems.map((item) => item.id).join(",");
+    const imagesChanged = initialImageIds !== currentImageIds;
+
+    // 3. Bandingkan kategori TikTok
+    const tiktokCategoryChanged =
+      initialState.tiktokCategoryId !== tiktokCategoryId;
+
+    // 4. Bandingkan atribut TikTok (lebih kompleks, JSON.stringify adalah cara mudah)
+    // Sekarang kita membandingkan objek sederhana, bukan array kompleks
+    const tiktokAttributesChanged =
+      JSON.stringify(initialState.tiktokProductAttributes) !==
+      JSON.stringify(currentSimpleTiktokAttributes);
+
+    // 5. Bandingkan platform
+    const platformsChanged =
+      JSON.stringify(initialState.listingPlatforms) !==
+      JSON.stringify(listingPlatforms);
+
+    // console.log("--- Cek Perubahan ---");
+    // console.log("Form Berubah:", formChanged);
+    // console.log("Deskripsi Berubah:", descriptionChanged);
+    // console.log("Gambar Berubah:", imagesChanged); // Seharusnya #3
+    // console.log("Kategori TikTok Berubah:", tiktokCategoryChanged); // Seharusnya #4
+    // console.log("Atribut TikTok Berubah:", tiktokAttributesChanged); // Seharusnya #5
+    // console.log("-----------------------");
+
+    // Kembalikan true jika salah satu dari perbandingan di atas benar
+    return (
+      formChanged ||
+      descriptionChanged ||
+      imagesChanged ||
+      tiktokCategoryChanged ||
+      tiktokAttributesChanged ||
+      platformsChanged
+    );
+  }, [
+    initialState,
+    form,
+    description,
+    imageItems,
+    tiktokCategoryId,
+    currentSimpleTiktokAttributes, // Ganti dependensi ke objek sederhana
+    listingPlatforms,
+  ]);
+
+  const handlePlatformChange = (platform) => {
+    setListingPlatforms((prev) =>
+      prev.includes(platform)
+        ? prev.filter((p) => p !== platform)
+        : [...prev, platform]
+    );
+  };
 
   // Callback untuk menerima data dari ProductTiktokSection
   const handleTiktokDataChange = useCallback(
@@ -416,14 +571,7 @@ const ProductDetailEdit = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    const cleanedDescription = form.description.replace(
-      /<p><br><\/p>/g,
-      "<br>"
-    );
-
+    const cleanedDescription = description.replace(/<p><br><\/p>/g, "<br>");
     const formData = new FormData();
     formData.append("name", form.name);
     formData.append("description", cleanedDescription);
@@ -441,8 +589,6 @@ const ProductDetailEdit = () => {
     formData.append("dimension", form.dimension);
     formData.append("annotations", form.annotations);
     formData.append("brand", form.brand);
-
-    // Tambahkan data TikTok ke FormData
     if (categoryKeyword) {
       formData.append("categoryKeyword", categoryKeyword);
     }
@@ -453,8 +599,7 @@ const ProductDetailEdit = () => {
         JSON.stringify(tiktokProductAttributes)
       );
     }
-
-    // Process sorted images
+    formData.append("listingPlatforms", JSON.stringify(listingPlatforms));
     imageItems.forEach((item) => {
       if (item.type === "existing") {
         formData.append("existingPictures[]", item.payload);
@@ -463,30 +608,26 @@ const ProductDetailEdit = () => {
       }
     });
 
-    try {
-      const success = await updateProduct(id, formData);
-      if (success) {
-        toast.success("Produk berhasil diperbarui");
+    const promise = updateProduct(id, formData);
+
+    toast.promise(promise, {
+      loading: "Menyimpan perubahan...",
+      success: async () => {
         setEditMode(false);
-        // refresh data
-        const refreshed = await fetchProductById(id);
-        setProduct(refreshed);
-        // Re-initialize image items from the newly saved data
-        setImageItems(
-          (refreshed.product_pictures || []).map((url) => ({
-            id: url,
-            type: "existing",
-            payload: url,
-          }))
-        );
-      } else {
-        toast.error("Gagal memperbarui produk");
-      }
-    } catch (error) {
-      toast.error("Terjadi kesalahan saat memperbarui produk");
-    } finally {
-      setIsSubmitting(false);
-    }
+        // Muat ulang data produk setelah berhasil
+        const refreshedProduct = await fetchProductById(id);
+        if (refreshedProduct) {
+          setProduct(refreshedProduct);
+          // Inisialisasi ulang state gambar dari data yang baru
+          const newImageItems = (refreshedProduct.product_pictures || []).map(
+            (url) => ({ id: url, type: "existing", payload: url })
+          );
+          setImageItems(newImageItems);
+        }
+        return "Produk berhasil diperbarui!";
+      },
+      error: (err) => err.message,
+    });
   };
 
   const confirmAndSubmit = (e) => {
@@ -499,6 +640,31 @@ const ProductDetailEdit = () => {
       onConfirm: () => handleSubmit(e),
       isDestructive: false,
       confirmText: "Simpan",
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setConfirmationModal({
+      isOpen: true,
+      title: "Konfirmasi Batal",
+      message:
+        "Anda yakin ingin membatalkan perubahan? Semua yang belum disimpan akan hilang.",
+      onConfirm: () => {
+        // Reset semua state ke kondisi awal
+        if (initialState) {
+          setForm(initialState.form);
+          setDescription(initialState.description);
+          setImageItems(initialState.imageItems);
+          const initialDims = JSON.parse(initialState.form.dimension);
+          setDimensionValues(initialDims);
+          setTiktokCategoryId(initialState.tiktokCategoryId);
+          setListingPlatforms(initialState.listingPlatforms);
+          // Atribut TikTok akan di-reset oleh komponen anak saat kategori berubah
+        }
+        setEditMode(false);
+      },
+      isDestructive: true,
+      confirmText: "Ya, Batalkan",
     });
   };
 
@@ -765,37 +931,18 @@ const ProductDetailEdit = () => {
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setConfirmationModal({
-                      isOpen: true,
-                      title: "Konfirmasi Batal",
-                      message:
-                        "Anda yakin ingin membatalkan perubahan? Semua yang belum disimpan akan hilang.",
-                      onConfirm: () => {
-                        setEditMode(false);
-                        const initialImages = (
-                          product.product_pictures || []
-                        ).map((url) => ({
-                          id: url,
-                          type: "existing",
-                          payload: url,
-                        }));
-                        setImageItems(initialImages);
-                      },
-                      isDestructive: true,
-                      confirmText: "Ya, Batalkan",
-                    });
-                  }}
+                  onClick={handleCancelEdit}
                   className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  // Menonaktifkan tombol jika sedang submitting ATAU jika tidak ada perubahan
+                  disabled={isSubmitting || !hasChanges}
                   className={`px-4 py-2 rounded-lg text-white ${
-                    isSubmitting
-                      ? "bg-accent/70 cursor-not-allowed"
+                    isSubmitting || !hasChanges
+                      ? "bg-gray-400 cursor-not-allowed" // Style saat nonaktif
                       : "bg-accent hover:bg-accent/90"
                   }`}
                 >
@@ -899,10 +1046,8 @@ const ProductDetailEdit = () => {
                       <div className="relative border border-gray-300 rounded-md overflow-hidden bg-white focus-within:ring-1 focus-within:ring-accent focus-within:border-accent">
                         <ReactQuill
                           theme="snow"
-                          value={form.description}
-                          onChange={(value) =>
-                            setForm({ ...form, description: value })
-                          }
+                          value={description}
+                          onChange={handleQuillChange}
                           modules={modules}
                           formats={formats}
                           placeholder="Deskripsi lengkap produk..."
@@ -1056,6 +1201,11 @@ const ProductDetailEdit = () => {
                           kg
                         </span>
                       </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Catatan: Jika berat kurang dari 1kg, masukkan 0.5. Rasio
+                        berat Seharusnya kurang dari 1.1. Rumus: (Panjang x
+                        Lebar x Tinggi / 6000) / Berat.
+                      </p>
                     </div>
 
                     <div className="col-span-2">
@@ -1189,6 +1339,33 @@ const ProductDetailEdit = () => {
                     initialAttributes={initialTiktokAttributes}
                     initialKeyword={product.product_keywords_search}
                   />
+                </div>
+
+                {/* Platform Selection */}
+                <div className="pt-6 border-t">
+                  <h2 className="text-lg font-semibold mb-4 text-gray-700">
+                    Platform Penjualan
+                  </h2>
+                  <div className="flex items-center gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 text-accent border-gray-300 rounded focus:ring-accent"
+                        checked={listingPlatforms.includes("TOKOPEDIA")}
+                        onChange={() => handlePlatformChange("TOKOPEDIA")}
+                      />
+                      <span className="text-sm font-medium">Tokopedia</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 text-accent border-gray-300 rounded focus:ring-accent"
+                        checked={listingPlatforms.includes("TIKTOK_SHOP")}
+                        onChange={() => handlePlatformChange("TIKTOK_SHOP")}
+                      />
+                      <span className="text-sm font-medium">TikTok Shop</span>
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>

@@ -7,6 +7,7 @@ const {
   sequelize,
 } = require("../models");
 const { getToken } = require("next-auth/jwt");
+const { createActivityLog } = require("../services/logService");
 
 const getUserFromToken = async (req) => {
   const token = await getToken({
@@ -149,7 +150,7 @@ exports.getAllReviews = async (req, res) => {
     console.error("Error getting all reviews:", error);
     res.status(500).json({ message: "Internal server error" });
   }
-}
+};
 
 exports.updateReviewStatus = async (req, res) => {
   const { id } = req.params;
@@ -165,16 +166,34 @@ exports.updateReviewStatus = async (req, res) => {
       return res.status(404).json({ message: "Review not found." });
     }
 
+    const oldStatus = review.status;
     review.status = status;
     await review.save();
 
     // Update product rating after changing review status
     await updateProductRating(review.product_id);
 
+    if (oldStatus !== status) {
+      await createActivityLog(
+        req,
+        req.user,
+        "UPDATE_STATUS",
+        { type: "Review", id: id },
+        { before: oldStatus, after: status }
+      );
+    }
+
     res.status(200).json({ message: "Review status updated successfully." });
   } catch (error) {
     console.error("Error updating review status:", error);
+    await createActivityLog(
+      req,
+      req.user,
+      "UPDATE_STATUS",
+      { type: "Review", id: id },
+      { error: error.message, attemptedChange: { status } },
+      "FAILED"
+    );
     res.status(500).json({ message: "Internal server error" });
   }
 };
-

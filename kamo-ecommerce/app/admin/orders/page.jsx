@@ -128,7 +128,10 @@ const Orders = () => {
                                     order.items[0].product.product_pictures[0]
                                   : "/no-image.png"
                               }
-                              alt={order.items[0].product?.product_name || 'Product Image'}
+                              alt={
+                                order.items[0].product?.product_name ||
+                                "Product Image"
+                              }
                               width={40}
                               height={40}
                               className="object-cover rounded-md"
@@ -137,7 +140,10 @@ const Orders = () => {
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">
                               {order.items[0].product?.product_name.length > 25
-                                ? `${order.items[0].product.product_name.substring(0, 25)}...`
+                                ? `${order.items[0].product.product_name.substring(
+                                    0,
+                                    25
+                                  )}...`
                                 : order.items[0].product?.product_name}
                             </div>
                             <div className="text-sm text-gray-500">
@@ -170,10 +176,21 @@ const Orders = () => {
                         {expandedOrder === order.order_id && (
                           <div className="mt-2 space-y-2">
                             {order.items.slice(1).map((item, index) => (
-                              <div key={index} className="flex items-center ml-4">
+                              <div
+                                key={index}
+                                className="flex items-center ml-4"
+                              >
                                 <Image
-                                  src={item.product?.product_pictures?.[0] ? baseUrl + item.product.product_pictures[0] : "/no-image.png"}
-                                  alt={item.product?.product_name || 'Product Image'}
+                                  src={
+                                    item.product?.product_pictures?.[0]
+                                      ? baseUrl +
+                                        item.product.product_pictures[0]
+                                      : "/no-image.png"
+                                  }
+                                  alt={
+                                    item.product?.product_name ||
+                                    "Product Image"
+                                  }
                                   width={30}
                                   height={30}
                                   className="object-cover rounded-md"
@@ -181,14 +198,19 @@ const Orders = () => {
                                 <div className="ml-2">
                                   <div className="text-xs text-gray-700">
                                     {item.product?.product_name.length > 25
-                                      ? `${item.product.product_name.substring(0, 25)}...`
-                                      : item.product?.product_name} (x{item.quantity})
+                                      ? `${item.product.product_name.substring(
+                                          0,
+                                          25
+                                        )}...`
+                                      : item.product?.product_name}{" "}
+                                    (x{item.quantity})
                                   </div>
                                   <div className="text-xs text-gray-500">
-                                    ID: {item.product?.product_id} | SKU: {item.product?.product_sku}
+                                    ID: {item.product?.product_id} | SKU:{" "}
+                                    {item.product?.product_sku}
                                   </div>
                                 </div>
-                            </div>
+                              </div>
                             ))}
                           </div>
                         )}

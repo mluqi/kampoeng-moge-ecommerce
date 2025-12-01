@@ -29,11 +29,11 @@ const diskStorage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     // [DIUBAH] Tentukan ekstensi file dari mimetype secara andal.
-    const ext = mimeToExt[file.mimetype] || path.extname(file.originalname);
-    cb(
-      null,
-      `${file.fieldname}-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`
-    );
+    const ext = mimeToExt[file.mimetype] || ".tmp";
+    // [DIUBAH] Buat nama file sementara yang unik.
+    // Nama akhir akan dibuat di controller setelah product_id digenerate.
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, `temp-${file.fieldname}-${uniqueSuffix}${ext}`);
   },
 });
 

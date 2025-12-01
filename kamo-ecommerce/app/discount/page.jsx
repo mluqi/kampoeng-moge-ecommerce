@@ -70,6 +70,11 @@ const DiscountProductsContent = () => {
     fetchPublicProducts,
   ]);
 
+  // Scroll ke atas setiap kali halaman berubah
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentPage]);
+
   // Fetch kategori saat komponen dimuat
   useEffect(() => {
     if (!categories || categories.length === 0) fetchCategories();

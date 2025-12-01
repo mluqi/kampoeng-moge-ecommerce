@@ -12,7 +12,9 @@ import toast from "react-hot-toast";
 
 const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-const ShippingInvoice = React.lazy(() => import('@/components/admin/ShippingInvoice'));
+const ShippingInvoice = React.lazy(() =>
+  import("@/components/admin/ShippingInvoice")
+);
 
 const OrderDetailContent = () => {
   const { id } = useParams();
@@ -133,19 +135,30 @@ const OrderDetailContent = () => {
               </button>
               <button
                 onClick={() => router.push(`/admin/invoice/${order.order_id}`)}
-                disabled={order.status === 'pending'}
+                disabled={order.status === "pending"}
                 className="bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 hover:bg-gray-700 disabled:bg-gray-400"
-                title={order.status === 'pending' ? "Pesanan belum dibayar" : "Cetak Invoice Penjualan"}
+                title={
+                  order.status === "pending"
+                    ? "Pesanan belum dibayar"
+                    : "Cetak Invoice Penjualan"
+                }
               >
                 <FaPrint /> Cetak Invoice Penjualan
               </button>
               <button
                 onClick={() => setShowShippingLabel(!showShippingLabel)}
-                disabled={order.status === 'pending' || order.status === 'cancelled'}
+                disabled={
+                  order.status === "pending" || order.status === "cancelled"
+                }
                 className="bg-blue-500 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 hover:bg-blue-600 disabled:bg-gray-400"
-                title={order.status === 'pending' || order.status === 'cancelled' ? "Tidak dapat mencetak label untuk pesanan ini" : "Cetak Label Pengiriman"}
+                title={
+                  order.status === "pending" || order.status === "cancelled"
+                    ? "Tidak dapat mencetak label untuk pesanan ini"
+                    : "Cetak Label Pengiriman"
+                }
               >
-                <FaTruck /> {showShippingLabel ? 'Sembunyikan' : 'Tampilkan'} Label Pengiriman
+                <FaTruck /> {showShippingLabel ? "Sembunyikan" : "Tampilkan"}{" "}
+                Label Pengiriman
               </button>
             </div>
           </div>
@@ -184,7 +197,12 @@ const OrderDetailContent = () => {
 
         {/* Order Status Tracker */}
         <div className="my-8">
-          <OrderStatusTracker status={order.status} shippingNumber={order.shipping_number} />
+          <OrderStatusTracker
+            status={order.status}
+            shippingNumber={order.shipping_number}
+            createdAt={order.createdAt}
+            updatedAt={order.updatedAt}
+          />
         </div>
 
         {/* Shipping Invoice Section */}

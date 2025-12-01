@@ -29,6 +29,8 @@ const {
   updateMultipleDiscountStatus,
   deleteDiscount,
   getProductsByIds,
+  uploadMultipleProductsToTiktok,
+  getProductsForTiktokPage,
 } = require("../controllers/productController");
 const multer = require("multer");
 const fs = require("fs");
@@ -44,6 +46,20 @@ const categoryStorage = multer.diskStorage({
   },
 });
 const uploadCategory = multer({ storage: categoryStorage });
+
+// Rute untuk mendapatkan produk untuk halaman unggah TikTok
+router.get(
+  "/admin/for-tiktok-page",
+  authMiddleware,
+  getProductsForTiktokPage
+);
+
+// Rute untuk mengunggah beberapa produk sekaligus
+router.post(
+  "/admin/upload-to-tiktok/bulk",
+  authMiddleware,
+  uploadMultipleProductsToTiktok
+);
 
 router.put("/admin/inline-edit/:id", authMiddleware, updateProductInline);
 router.put(

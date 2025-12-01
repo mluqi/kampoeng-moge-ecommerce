@@ -234,7 +234,7 @@ const FeaturedProductsAdminPage = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[110] p-4 overflow-y-auto">
           {" "}
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl m-4 relative">
             <button

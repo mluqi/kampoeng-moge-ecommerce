@@ -11,6 +11,8 @@ const { Op } = require("sequelize");
 const fs = require("fs");
 const path = require("path");
 const jwt = require("jsonwebtoken");
+const { compressImage } = require("../utils/imageCompression");
+const { createActivityLog } = require("../services/logService");
 
 // Helper function to safely parse JSON fields from a product object
 const parseProductJSONFields = (productInstance) => {
@@ -358,96 +360,119 @@ exports.createProduct = async (req, res) => {
     tiktokCategoryId,
     tiktokProductAttributes,
     categoryKeyword,
+    listingPlatforms,
   } = req.body;
 
-  if (
-    !name ||
-    !description ||
-    !sku ||
-    !price ||
-    !stock ||
-    !category ||
-    !status ||
-    !weight ||
-    !dimension ||
-    !condition ||
-    !brand ||
-    !tiktokCategoryId
-  ) {
-    return res.status(400).json({ message: "All fields are required" });
-  }
-
-  // --- START: TikTok API Validation ---
-  if (name.length < 25 || name.length > 255) {
-    return res
-      .status(400)
-      .json({ message: "Judul produk harus antara 25 dan 255 karakter." });
-  }
-
-  // Validasi panjang deskripsi (mengabaikan tag HTML untuk penghitungan)
-  const plainTextDescription = description.replace(/<[^>]*>?/gm, "");
-  if (plainTextDescription.length < 60 || plainTextDescription.length > 10000) {
-    return res.status(400).json({
-      message: "Deskripsi produk harus antara 60 dan 10.000 karakter.",
-    });
-  }
-
+  const renamedPictures = [];
   try {
-    const parsedDimensions = JSON.parse(dimension);
-    const { length, width, height } = parsedDimensions;
-    const weightKg = parseFloat(weight);
-
+    // --- START: Validation ---
     if (
-      length <= 0 ||
-      length > 60 ||
-      width <= 0 ||
-      width > 60 ||
-      height <= 0 ||
-      height > 60
+      !name ||
+      !description ||
+      !sku ||
+      !price ||
+      !stock ||
+      !category ||
+      !status ||
+      !weight ||
+      !dimension ||
+      !condition ||
+      !brand ||
+      !tiktokCategoryId ||
+      !listingPlatforms
     ) {
-      return res.status(400).json({
-        message:
-          "Setiap dimensi (panjang, lebar, tinggi) harus antara 0.01 dan 60 cm.",
-      });
+      throw new Error("Semua field wajib diisi.");
+    }
+    if (name.length < 25 || name.length > 255) {
+      throw new Error("Judul produk harus antara 25 dan 255 karakter.");
     }
 
-    if (weightKg > 0) {
-      const chargeableWeightRatio = (length * width * height) / 6000 / weightKg;
-      if (chargeableWeightRatio >= 1.1) {
-        return res.status(400).json({
-          message: `Rasio berat yang dapat ditagih terlalu tinggi (${chargeableWeightRatio.toFixed(
-            2
-          )}). Seharusnya kurang dari 1.1. Rumus: (P x L x T / 6000) / Berat.`,
-        });
+    // Validasi keunikan SKU saat membuat produk baru
+    const existingSku = await Product.findOne({
+      where: { product_sku: sku },
+    });
+    if (existingSku) {
+      throw new Error("SKU sudah terdaftar. Harap gunakan SKU yang unik.");
+    }
+    const plainTextDescription = description.replace(/<[^>]*>?/gm, "");
+    if (
+      plainTextDescription.length < 60 ||
+      plainTextDescription.length > 10000
+    ) {
+      throw new Error("Deskripsi produk harus antara 60 dan 10.000 karakter.");
+    }
+    try {
+      const parsedDimensions = JSON.parse(dimension);
+      const { length, width, height } = parsedDimensions;
+      const weightKg = parseFloat(weight);
+
+      // Validasi rasio berat volumetrik hanya jika berat produk lebih dari 1 kg.
+      if (weightKg >= 1) {
+        const chargeableWeightRatio =
+          (length * width * height) / 6000 / weightKg;
+        if (chargeableWeightRatio >= 1.1) {
+          throw new Error(
+            `Rasio berat volume terlalu tinggi (${chargeableWeightRatio.toFixed(
+              2
+            )}). Seharusnya di bawah 1.1. Rumus: (P x L x T / 6000) / Berat.`
+          );
+        }
+      }
+    } catch (e) {
+      // Re-throw the original, more specific error message
+      throw new Error(
+        e.message ||
+          "Format dimensi tidak valid atau field berat/dimensi kosong."
+      );
+    }
+    const categoryExists = await Category.findByPk(category);
+    if (!categoryExists) {
+      throw new Error("Kategori tidak ditemukan.");
+    }
+
+    let platforms = [];
+    try {
+      platforms = JSON.parse(listingPlatforms);
+      if (!Array.isArray(platforms) || platforms.length === 0) {
+        throw new Error("Platform penjualan tidak valid atau kosong.");
+      }
+    } catch (e) {
+      throw new Error("Format platform penjualan tidak valid.");
+    }
+    // --- END: Validation ---
+
+    const product_id = await generateProductId();
+
+    // [DIUBAH] Proses rename file setelah mendapatkan product_id
+    if (req.files && req.files.pictures && req.files.pictures.length > 0) {
+      const pictureFiles = Array.isArray(req.files.pictures)
+        ? req.files.pictures
+        : [req.files.pictures];
+
+      for (let i = 0; i < pictureFiles.length; i++) {
+        const file = pictureFiles[i];
+        const tempPath = file.path;
+        const ext = path.extname(file.filename);
+        const newFilename = `product-${product_id}-${i + 1}${ext}`;
+        const newPath = path.join(path.dirname(tempPath), newFilename);
+
+        // Rename file
+        fs.renameSync(tempPath, newPath);
+
+        //compress image
+        await compressImage(newPath);
+
+        // Simpan path publik yang baru
+        renamedPictures.push(`/uploads/products/${newFilename}`);
       }
     }
-  } catch (e) {
-    return res.status(400).json({ message: "Format dimensi tidak valid." });
-  }
-  // --- END: TikTok API Validation ---
 
-  let pictures = [];
-  if (req.files && req.files.pictures && req.files.pictures.length > 0) {
-    pictures = Array.isArray(req.files.pictures)
-      ? req.files.pictures.map((file) => `/uploads/products/${file.filename}`)
-      : [`/uploads/products/${req.files.pictures.filename}`];
-  }
-
-  const categoryExists = await Category.findByPk(category);
-
-  if (!categoryExists) {
-    deleteFiles(pictures, "products");
-    return res.status(400).json({ message: "Category not found" });
-  }
-
-  try {
     // DYNAMIC IMPORT: Untuk memutus dependensi melingkar
     const {
       createProduct: createTiktokProduct,
       uploadImage: uploadTiktokImage,
     } = require("../services/tiktokShop");
 
-    const product_id = await generateProductId();
     const product = await Product.create({
       product_id: product_id,
       product_name: name,
@@ -455,7 +480,7 @@ exports.createProduct = async (req, res) => {
       product_sku: sku,
       product_price: price,
       product_price_tiktok:
-        product_price_tiktok === "" ? null : product_price_tiktok,
+        product_price_tiktok === "" ? price : product_price_tiktok,
       product_stock: stock,
       product_condition: condition,
       product_status: status,
@@ -465,114 +490,150 @@ exports.createProduct = async (req, res) => {
       product_keyword_search: categoryKeyword,
       product_weight: weight,
       product_dimensions: dimension,
-      product_pictures: JSON.stringify(pictures), // Stringify the pictures array
+      product_pictures: JSON.stringify(renamedPictures),
+      product_listing_platforms: JSON.stringify(platforms),
       product_annotations: annotations,
       product_brand: brand,
     });
 
+    // Log SUKSES setelah produk berhasil dibuat
+    await createActivityLog(
+      req,
+      req.user,
+      "CREATE",
+      { type: "Product", id: product.product_id },
+      { createdData: product.get({ plain: true }) },
+      "SUCCESS"
+    );
+
     // --- Integrasi TikTok Shop ---
     // Pastikan ada kategori dan gambar sebelum mencoba membuat di TikTok
-    if (tiktokCategoryId && req.files?.pictures?.length > 0) {
-      try {
-        console.log("Starting TikTok Shop product creation...");
+    if (tiktokCategoryId && renamedPictures.length > 0) {
+      console.log("Starting TikTok Shop product creation...");
 
-        // 1. Upload images to TikTok
-        let imageUris = [];
-        if (req.files?.pictures?.length > 0) {
-          const uploadPromises = req.files.pictures.map((file) => {
-            const imageBuffer = fs.readFileSync(file.path);
-            return uploadTiktokImage(imageBuffer);
-          });
+      // 1. Upload images to TikTok
+      let imageUris = [];
+      if (renamedPictures.length > 0) {
+        const uploadPromises = renamedPictures.map((fileUrl) => {
+          const file = {
+            path: path.join(__dirname, "..", fileUrl.substring(1)),
+          };
+          const imageBuffer = fs.readFileSync(file.path);
+          return uploadTiktokImage(imageBuffer);
+        });
 
-          const uploadResults = await Promise.all(uploadPromises);
-          imageUris = uploadResults
-            .map((res) => {
-              if (!res?.data?.uri) {
-                console.error("A TikTok image upload failed:", res);
-                return null;
-              }
-              return { uri: res.data.uri };
-            })
-            .filter(Boolean); // Filter out any nulls from failed uploads
-        }
+        const uploadResults = await Promise.all(uploadPromises);
+        imageUris = uploadResults
+          .map((res) => {
+            if (!res?.data?.uri) {
+              console.error("A TikTok image upload failed:", res);
+              return null;
+            }
+            return { uri: res.data.uri };
+          })
+          .filter(Boolean); // Filter out any nulls from failed uploads
+      }
 
-        if (imageUris.length === 0) {
-          throw new Error(
-            "At least one image is required for TikTok Shop, and all uploads failed."
-          );
-        }
-
-        // 2. Prepare the product payload for TikTok
-        const parsedDimensions = JSON.parse(dimension);
-        const tiktokPayload = {
-          title: name,
-          description: description,
-          category_id: tiktokCategoryId,
-          main_images: imageUris,
-          product_attributes: JSON.parse(tiktokProductAttributes),
-          package_dimensions: {
-            length: parsedDimensions.length,
-            width: parsedDimensions.width,
-            height: parsedDimensions.height,
-            unit: "CENTIMETER",
-          },
-          package_weight: { value: weight, unit: "KILOGRAM" },
-          skus: [
-            {
-              price: {
-                amount: product_price_tiktok || price,
-                currency: "IDR",
-              },
-              inventory: [
-                {
-                  warehouse_id: process.env.TIKPED_WAREHOUSE_ID,
-                  quantity: parseInt(stock, 10),
-                },
-              ],
-              seller_sku: sku,
-            },
-          ],
-          listing_platforms: ["TOKOPEDIA", "TIKTOK_SHOP"],
-        };
-
-        const tiktokResponse = await createTiktokProduct(tiktokPayload);
-        console.log(tiktokResponse);
-        if (!tiktokResponse?.data?.product_id) {
-          await product.destroy();
-          deleteFiles(pictures);
-          return res.status(500).json({ message: "Failed to create product" });
-        }
-
-        console.log(
-          "✅ Product successfully created on TikTok Shop:",
-          tiktokResponse?.data || tiktokResponse
-        );
-
-        // Simpan ID produk dari TikTok ke database lokal
-        if (
-          tiktokResponse?.data?.product_id &&
-          tiktokResponse?.data?.skus?.[0].id
-        ) {
-          await product.update({
-            product_tiktok_id: tiktokResponse.data.product_id,
-            product_tiktok_sku_id: tiktokResponse.data.skus[0].id,
-          });
-          console.log(
-            `Saved TikTok product ID ${tiktokResponse.data.product_id} to local product ${product.product_id}`
-          );
-        }
-      } catch (tiktokError) {
-        console.error(
-          "❌ Failed to create product on TikTok Shop. The product was saved locally.",
-          tiktokError
+      if (imageUris.length === 0) {
+        throw new Error(
+          "At least one image is required for TikTok Shop, and all uploads failed."
         );
       }
+
+      // 2. Prepare the product payload for TikTok
+      const parsedDimensions = JSON.parse(dimension);
+      const tiktokPayload = {
+        title: name,
+        is_cod_allowed: false,
+        external_product_id: product_id,
+        description: description,
+        category_id: tiktokCategoryId,
+        main_images: imageUris,
+        product_attributes: JSON.parse(tiktokProductAttributes),
+        package_dimensions: {
+          length: parsedDimensions.length,
+          width: parsedDimensions.width,
+          height: parsedDimensions.height,
+          unit: "CENTIMETER",
+        },
+        package_weight: { value: weight, unit: "KILOGRAM" },
+        skus: [
+          {
+            price: {
+              amount: product_price_tiktok || price,
+              currency: "IDR",
+            },
+            inventory: [
+              {
+                warehouse_id: process.env.TIKPED_WAREHOUSE_ID,
+                quantity: parseInt(stock, 10),
+              },
+            ],
+            seller_sku: sku,
+          },
+        ],
+        listing_platforms: platforms,
+      };
+
+      const tiktokResponse = await createTiktokProduct(tiktokPayload);
+      console.log("TikTok Create Response:", tiktokResponse);
+
+      // [VALIDASI BARU] Periksa 'code' dari respons TikTok. Jika bukan 0, gagalkan.
+      if (tiktokResponse?.code !== 0 || !tiktokResponse?.data?.product_id) {
+        // Rollback local product creation if TikTok fails
+        await product.destroy();
+        // Throw an error to be caught by the main catch block
+        throw new Error(
+          `Gagal membuat produk di TikTok Shop (Code: ${
+            tiktokResponse?.code || "N/A"
+          }): ${tiktokResponse?.message || "Unknown error"}`
+        );
+      }
+
+      console.log(
+        "✅ Product successfully created on TikTok Shop:",
+        tiktokResponse.data
+      );
+
+      // Simpan ID produk dari TikTok ke database lokal
+      await product.update({
+        product_tiktok_id: tiktokResponse.data.product_id,
+        product_tiktok_sku_id: tiktokResponse.data.skus[0].id,
+      });
+      console.log(
+        `Saved TikTok product ID ${tiktokResponse.data.product_id} to local product ${product.product_id}`
+      );
     }
 
     res.status(201).json(product);
   } catch (error) {
-    deleteFiles(pictures);
-    res.status(500).json({ message: error.message });
+    deleteFiles(renamedPictures, "products");
+
+    // Log the failure
+    await createActivityLog(
+      req,
+      req.user,
+      "CREATE",
+      { type: "Product", id: "N/A" },
+      {
+        error: error.message,
+        attemptedData: { name, sku, price, stock, category },
+      },
+      "FAILED"
+    );
+
+    // Send error response
+    const isValidationError = [
+      "wajib diisi",
+      "karakter",
+      "dimensi",
+      "Kategori tidak ditemukan",
+    ].some((term) => error.message.includes(term));
+    const statusCode = isValidationError ? 400 : 500;
+    res.status(statusCode).json({
+      code: statusCode,
+      message: error.message,
+    });
   }
 };
 
@@ -596,75 +657,111 @@ exports.updateProduct = async (req, res) => {
     tiktokCategoryId,
     tiktokProductAttributes,
     categoryKeyword,
+    listingPlatforms,
   } = req.body;
+
+  const productId = req.params.id;
 
   let existingPictures = req.body.existingPictures || [];
   if (typeof existingPictures === "string") {
     existingPictures = [existingPictures];
   }
 
-  let pictures = [];
-  if (req.files && req.files.pictures && req.files.pictures.length > 0) {
-    pictures = Array.isArray(req.files.pictures)
-      ? req.files.pictures.map((file) => `/uploads/products/${file.filename}`)
-      : [`/uploads/products/${req.files.pictures.filename}`];
-  } else {
-    console.log("No new pictures uploaded");
-    pictures = [];
-  }
+  const renamedNewPictures = [];
+  const newPictureFiles =
+    req.files && req.files.pictures
+      ? Array.isArray(req.files.pictures)
+        ? req.files.pictures
+        : [req.files.pictures]
+      : [];
 
-  // --- START: TikTok API Validation ---
-  if (name && (name.length < 25 || name.length > 255)) {
-    return res
-      .status(400)
-      .json({ message: "Judul produk harus antara 25 dan 255 karakter." });
-  }
-
-  if (
-    description &&
-    (description.replace(/<[^>]*>?/gm, "").length < 60 ||
-      description.length > 10000)
-  ) {
-    return res.status(400).json({
-      message: "Deskripsi produk harus antara 60 dan 10.000 karakter.",
-    });
-  }
-
-  try {
-    const parsedDimensions = JSON.parse(dimension);
-    const { length, width, height } = parsedDimensions;
-    const weightKg = parseFloat(weight);
-
-    if (
-      length <= 0 ||
-      length > 60 ||
-      width <= 0 ||
-      width > 60 ||
-      height <= 0 ||
-      height > 60
-    ) {
-      return res.status(400).json({
-        message:
-          "Setiap dimensi (panjang, lebar, tinggi) harus antara 0.01 dan 60 cm.",
+  if (newPictureFiles.length > 0) {
+    // Find the highest existing file index for this product to avoid name collisions.
+    const uploadDir = path.join(__dirname, `../uploads/products`);
+    let maxIndex = 0;
+    try {
+      const filesInDir = fs.readdirSync(uploadDir);
+      filesInDir.forEach((f) => {
+        const match = f.match(`^product-${productId}-(\\d+)\\.`);
+        if (match) {
+          const index = parseInt(match[1], 10);
+          if (index > maxIndex) {
+            maxIndex = index;
+          }
+        }
       });
+    } catch (e) {
+      console.warn("Could not read product upload directory.", e);
     }
 
-    if (weightKg > 0) {
-      const chargeableWeightRatio = (length * width * height) / 6000 / weightKg;
-      if (chargeableWeightRatio >= 1.1) {
-        return res.status(400).json({
-          message: `Rasio berat yang dapat ditagih terlalu tinggi (${chargeableWeightRatio.toFixed(
-            2
-          )}). Seharusnya kurang dari 1.1. Rumus: (P x L x T / 6000) / Berat.`,
-        });
-      }
+    // Rename new files using a safe, incrementing index.
+    for (let i = 0; i < newPictureFiles.length; i++) {
+      const file = newPictureFiles[i];
+      const tempPath = file.path;
+      const ext = path.extname(file.filename);
+      const newIndex = maxIndex + i + 1;
+      const newFilename = `product-${productId}-${newIndex}${ext}`;
+      const newPath = path.join(path.dirname(tempPath), newFilename);
+
+      fs.renameSync(tempPath, newPath);
+
+      // Compress image
+      await compressImage(newPath);
+
+      renamedNewPictures.push(`/uploads/products/${newFilename}`);
     }
-  } catch (e) {
-    return res.status(400).json({ message: "Format dimensi tidak valid." });
   }
-  // --- END: TikTok API Validation ---
 
   try {
+    // --- START: Validation ---
+    if (name && (name.length < 25 || name.length > 255)) {
+      throw new Error("Judul produk harus antara 25 dan 255 karakter.");
+    }
+    if (
+      (description &&
+        (description.replace(/<[^>]*>?/gm, "").length < 60 ||
+          description.length > 10000)) ||
+      (sku &&
+        (await Product.findOne({
+          where: {
+            product_sku: sku,
+            product_id: { [Op.ne]: productId }, // Pastikan bukan produk yang sama
+          },
+        })))
+    ) {
+      if (sku) {
+        throw new Error(
+          "SKU sudah terdaftar pada produk lain. Harap gunakan SKU yang unik."
+        );
+      }
+      throw new Error("Deskripsi produk harus antara 60 dan 10.000 karakter.");
+    }
+    try {
+      const parsedDimensions = JSON.parse(dimension);
+      const { length, width, height } = parsedDimensions;
+      const weightKg = parseFloat(weight);
+
+      // Validasi rasio berat volumetrik hanya jika berat produk lebih dari 1 kg.
+      if (weightKg >= 1) {
+        const chargeableWeightRatio =
+          (length * width * height) / 6000 / weightKg;
+        if (chargeableWeightRatio >= 1.1) {
+          throw new Error(
+            `Rasio berat volume terlalu tinggi (${chargeableWeightRatio.toFixed(
+              2
+            )}). Seharusnya di bawah 1.1. Rumus: (P x L x T / 6000) / Berat.`
+          );
+        }
+      }
+    } catch (e) {
+      // Re-throw the original, more specific error message
+      throw new Error(
+        e.message ||
+          "Format dimensi tidak valid atau field berat/dimensi kosong."
+      );
+    }
+    // --- END: Validation ---
+
     // DYNAMIC IMPORT: Untuk memutus dependensi melingkar
     const {
       createProduct: createTiktokProduct,
@@ -672,10 +769,35 @@ exports.updateProduct = async (req, res) => {
       uploadImage: uploadTiktokImage,
     } = require("../services/tiktokShop");
 
+    // Validasi Berat vs Dimensi (jika ada data yang diupdate)
+    if (dimension && weight) {
+      const parsedDimensions = JSON.parse(dimension);
+      const { length, width, height } = parsedDimensions;
+      const weightKg = parseFloat(weight);
+
+      if (!length || !width || !height || !weightKg) {
+        throw new Error(
+          "Berat dan dimensi (panjang, lebar, tinggi) wajib diisi dengan angka yang valid."
+        );
+      }
+
+      // Validasi rasio berat volumetrik hanya jika berat produk lebih dari 1 kg.
+      if (weightKg >= 1) {
+        const chargeableWeightRatio =
+          (length * width * height) / 6000 / weightKg;
+        if (chargeableWeightRatio >= 1.1) {
+          throw new Error(
+            `Rasio berat volume terlalu tinggi (${chargeableWeightRatio.toFixed(
+              2
+            )}). Seharusnya di bawah 1.1. Rumus: (P x L x T / 6000) / Berat.`
+          );
+        }
+      }
+    }
+
     const product = await Product.findByPk(req.params.id);
     if (!product) {
-      deleteFiles(pictures);
-      return res.status(404).json({ message: "Product not found" });
+      throw new Error("Produk tidak ditemukan.");
     }
 
     let oldPictures = [];
@@ -697,21 +819,18 @@ exports.updateProduct = async (req, res) => {
       }
     }
     // Gabungkan gambar yang ada (yang tidak dihapus) dengan gambar baru.
-    // Gunakan Set untuk secara otomatis menangani duplikasi.
-    const finalPictures = [...new Set([...existingPictures, ...pictures])];
-
+    const finalPictures = [...existingPictures, ...renamedNewPictures];
     const picturesToDelete = oldPictures.filter(
       (oldPic) => !finalPictures.includes(oldPic)
     );
-    deleteFiles(picturesToDelete);
 
-    await product.update({
+    product.set({
       product_name: name,
       product_description: description,
       product_sku: sku,
       product_price: price,
       product_price_tiktok:
-        product_price_tiktok === "" ? null : product_price_tiktok,
+        product_price_tiktok === "" ? price : product_price_tiktok,
       product_stock: stock,
       product_condition: condition,
       product_status: status,
@@ -721,120 +840,179 @@ exports.updateProduct = async (req, res) => {
       product_keyword_search: categoryKeyword,
       product_weight: weight,
       product_dimensions: dimension,
-      product_pictures: JSON.stringify(finalPictures), // Stringify the pictures array
+      product_pictures: JSON.stringify(finalPictures),
+      product_listing_platforms: listingPlatforms, // Already a stringified JSON from FormData
       product_annotations: annotations,
       product_brand: brand,
     });
 
-    // --- Integrasi TikTok Shop ---
-    if (tiktokCategoryId) {
-      try {
-        // 1. Handle image uploads (gabungkan gambar yang ada dan yang baru)
-        const allImageFiles = [
-          ...(existingPictures || []),
-          ...(req.files?.pictures || []),
-        ];
+    const changedKeys = product.changed();
 
-        let imageUris = [];
-        if (allImageFiles.length > 0) {
-          const uploadPromises = allImageFiles
-            .map((file) => {
-              // file bisa berupa path string atau objek file dari multer
-              const filePath =
-                typeof file === "string"
-                  ? path.join(__dirname, "..", file.substring(1)) // Sesuaikan path relatif
-                  : file.path;
-
-              if (!fs.existsSync(filePath)) {
-                console.warn(
-                  `File gambar tidak ditemukan, dilewati: ${filePath}`
-                );
-                return null;
-              }
-              const imageBuffer = fs.readFileSync(filePath);
-              return uploadTiktokImage(imageBuffer);
-            })
-            .filter(Boolean);
-
-          const uploadResults = await Promise.all(uploadPromises);
-          imageUris = uploadResults
-            .map((res) => (res?.data?.uri ? { uri: res.data.uri } : null))
-            .filter(Boolean);
-        }
-
-        // 2. Siapkan payload TikTok
-        const parsedDimensions = JSON.parse(dimension);
-        const tiktokPayload = {
-          title: name,
-          description: description,
-          category_id: tiktokCategoryId,
-          ...(imageUris.length > 0 && { main_images: imageUris }), // Hanya sertakan jika ada gambar
-          product_attributes: JSON.parse(tiktokProductAttributes),
-          package_dimensions: {
-            length: parsedDimensions.length,
-            width: parsedDimensions.width,
-            height: parsedDimensions.height,
-            unit: "CENTIMETER",
-          },
-          package_weight: { value: weight, unit: "KILOGRAM" },
-          skus: [
-            {
-              price: {
-                amount: product_price_tiktok || price,
-                currency: "IDR",
-              },
-              inventory: [
-                {
-                  warehouse_id: process.env.TIKPED_WAREHOUSE_ID,
-                  quantity: parseInt(stock, 10),
-                },
-              ],
-              seller_sku: sku,
-            },
-          ],
+    if (changedKeys && changedKeys.length > 0) {
+      const changesForLog = {};
+      for (const key of changedKeys) {
+        changesForLog[key] = {
+          before: product.previous(key),
+          after: product.get(key),
         };
+      }
 
-        // 3. Tentukan apakah akan membuat baru atau memperbarui di TikTok
-        if (product.product_tiktok_id) {
-          console.log(
-            `Updating product on TikTok Shop (ID: ${product.product_tiktok_id})...`
-          );
-          const tiktokResponse = await updateTiktokProduct(
-            product.product_tiktok_id,
-            tiktokPayload
-          );
-          console.log(
-            "✅ Product successfully updated on TikTok Shop:",
-            tiktokResponse?.data || tiktokResponse
-          );
-        } else {
-          console.log("Product does not exist on TikTok Shop, creating new...");
-          const tiktokResponse = await createTiktokProduct(tiktokPayload);
-          console.log(
-            "✅ Product successfully created on TikTok Shop:",
-            tiktokResponse?.data || tiktokResponse
-          );
-          if (tiktokResponse?.data?.product_id) {
-            await product.update({
-              product_tiktok_id: tiktokResponse.data.product_id,
-            });
+      await product.save();
+      // Hapus gambar lama hanya setelah update berhasil
+      deleteFiles(picturesToDelete, "products");
+
+      await createActivityLog(
+        req,
+        req.user,
+        "UPDATE",
+        { type: "Product", id: product.product_id },
+        changesForLog,
+        "SUCCESS"
+      );
+
+      // --- Integrasi TikTok Shop ---
+      if (tiktokCategoryId) {
+        try {
+          // 1. Handle image uploads (gabungkan gambar yang ada dan yang baru)
+          const allImageFiles = [
+            ...(existingPictures || []),
+            ...(req.files?.pictures || []),
+          ];
+
+          let imageUris = [];
+          if (allImageFiles.length > 0) {
+            const uploadPromises = allImageFiles
+              .map((file) => {
+                // file bisa berupa path string atau objek file dari multer
+                const filePath =
+                  typeof file === "string"
+                    ? path.join(__dirname, "..", file.substring(1)) // Sesuaikan path relatif
+                    : file.path;
+
+                if (!fs.existsSync(filePath)) {
+                  console.warn(
+                    `File gambar tidak ditemukan, dilewati: ${filePath}`
+                  );
+                  return null;
+                }
+                const imageBuffer = fs.readFileSync(filePath);
+                return uploadTiktokImage(imageBuffer);
+              })
+              .filter(Boolean);
+
+            const uploadResults = await Promise.all(uploadPromises);
+            imageUris = uploadResults
+              .map((res) => (res?.data?.uri ? { uri: res.data.uri } : null))
+              .filter(Boolean);
+          }
+
+          // 2. Siapkan payload TikTok
+          const parsedDimensions = JSON.parse(dimension);
+          const tiktokPayload = {
+            title: name,
+            description: description,
+            category_id: tiktokCategoryId,
+            ...(imageUris.length > 0 && { main_images: imageUris }), // Hanya sertakan jika ada gambar
+            product_attributes: JSON.parse(tiktokProductAttributes),
+            package_dimensions: {
+              length: parsedDimensions.length,
+              width: parsedDimensions.width,
+              height: parsedDimensions.height,
+              unit: "CENTIMETER",
+            },
+            package_weight: { value: weight, unit: "KILOGRAM" },
+            skus: [
+              {
+                price: {
+                  amount: product_price_tiktok || price,
+                  currency: "IDR",
+                },
+                inventory: [
+                  {
+                    warehouse_id: process.env.TIKPED_WAREHOUSE_ID,
+                    quantity: parseInt(stock, 10),
+                  },
+                ],
+                seller_sku: sku,
+              },
+            ],
+            listing_platforms: product.product_listing_platforms
+              ? JSON.parse(product.product_listing_platforms)
+              : ["TOKOPEDIA", "TIKTOK_SHOP"], // Fallback for older products
+          };
+
+          // 3. Tentukan apakah akan membuat baru atau memperbarui di TikTok
+          if (product.product_tiktok_id) {
             console.log(
-              `Saved new TikTok product ID ${tiktokResponse.data.product_id} to local product ${product.product_id}`
+              `Updating product on TikTok Shop (ID: ${product.product_tiktok_id})...`
+            );
+            const tiktokResponse = await updateTiktokProduct(
+              product.product_tiktok_id,
+              tiktokPayload
+            );
+            // [VALIDASI BARU] Periksa 'code' dari respons TikTok.
+            if (tiktokResponse?.code === 0) {
+              console.log(
+                "✅ Product successfully updated on TikTok Shop:",
+                tiktokResponse.data
+              );
+            } else {
+              // Log error tanpa menghentikan proses, agar update lokal tetap tersimpan.
+              console.error(
+                `❌ Gagal memperbarui produk di TikTok Shop (Code: ${
+                  tiktokResponse?.code || "N/A"
+                }): ${tiktokResponse?.message || "Unknown error"}`
+              );
+            }
+          } else if (product.product_tiktok_id === null) {
+            console.log(
+              "Product does not exist on TikTok Shop, skipping update."
+            );
+          } else {
+            // This case should ideally not be hit if product_tiktok_id is null or valid
+            console.warn(
+              "Unexpected state: product_tiktok_id is not null but also not a valid ID for update."
             );
           }
+        } catch (tiktokError) {
+          console.error(
+            "❌ Failed to sync product with TikTok Shop. The product was updated locally.",
+            tiktokError
+          );
         }
-      } catch (tiktokError) {
-        console.error(
-          "❌ Failed to sync product with TikTok Shop. The product was updated locally.",
-          tiktokError
-        );
       }
+    } else {
+      // Jika tidak ada perubahan, hapus file baru yang mungkin diunggah
+      deleteFiles(renamedNewPictures, "products");
     }
 
     res.status(200).json(product);
   } catch (error) {
-    deleteFiles(pictures); // Jika update gagal, hapus file yang baru diunggah
-    res.status(500).json({ message: error.message });
+    // Cleanup any newly uploaded & renamed files if an error occurs
+    deleteFiles(renamedNewPictures, "products");
+
+    // Log the failure
+    await createActivityLog(
+      req,
+      req.user,
+      "UPDATE",
+      { type: "Product", id: req.params.id },
+      {
+        error: error.message,
+        attemptedChanges: { name, sku, price, stock, category },
+      },
+      "FAILED"
+    );
+
+    // Send error response
+    const isValidationError = [
+      "wajib diisi",
+      "karakter",
+      "dimensi",
+      "Produk tidak ditemukan",
+    ].some((term) => error.message.includes(term));
+    const statusCode = isValidationError ? 400 : 500;
+    res.status(statusCode).json({ message: error.message });
   }
 };
 
@@ -848,10 +1026,28 @@ exports.updateProductStatus = async (req, res) => {
     if (!product) {
       return res.status(404).json({ message: "Produk tidak ditemukan" });
     }
-    product.product_status = status;
-    await product.save();
+    const oldStatus = product.product_status;
+    if (oldStatus !== status) {
+      product.product_status = status;
+      await product.save();
+      await createActivityLog(
+        req,
+        req.user,
+        "UPDATE_STATUS",
+        { type: "Product", id: product.product_id },
+        { before: oldStatus, after: status }
+      );
+    }
     res.status(200).json({ message: "Status produk berhasil diubah", product });
   } catch (error) {
+    await createActivityLog(
+      req,
+      req.user,
+      "UPDATE_STATUS",
+      { type: "Product", id: req.params.id },
+      { error: error.message, attemptedChange: { status } },
+      "FAILED"
+    );
     res.status(500).json({ message: error.message });
   }
 };
@@ -913,27 +1109,50 @@ exports.syncStockToTiktok = async function (productId, newStock) {
 
 // Delete product
 exports.deleteProduct = async (req, res) => {
+  const productId = req.params.id;
   try {
-    const product = await Product.findByPk(req.params.id);
+    const product = await Product.findByPk(productId);
     if (!product) return res.status(404).json({ message: "Product not found" });
+
+    const productDataForLog = product.get({ plain: true });
 
     // Parse product_pictures from string to array before deleting files
     if (product.product_pictures) {
       try {
         const picturesArray = JSON.parse(product.product_pictures);
         if (picturesArray && picturesArray.length > 0) {
-          deleteFiles(picturesArray);
+          deleteFiles(picturesArray, "products");
         }
       } catch (e) {
         console.error(
-          `Could not parse product_pictures for product ${req.params.id} on delete`,
+          `Could not parse product_pictures for product ${productId} on delete`,
           e
         );
       }
     }
     await product.destroy();
+
+    // Log SUKSES setelah produk berhasil dihapus
+    await createActivityLog(
+      req,
+      req.user,
+      "DELETE",
+      { type: "Product", id: productId },
+      { deletedData: productDataForLog },
+      "SUCCESS"
+    );
+
     res.status(200).json({ message: "Product deleted" });
   } catch (error) {
+    // Log GAGAL jika terjadi error saat penghapusan
+    await createActivityLog(
+      req,
+      req.user,
+      "DELETE",
+      { type: "Product", id: productId },
+      { error: error.message },
+      "FAILED"
+    );
     res.status(500).json({ message: error.message });
   }
 };
@@ -971,6 +1190,10 @@ exports.addCategory = async (req, res) => {
   if (req.files && req.files.pictures && req.files.pictures.length > 0) {
     // Ambil hanya gambar pertama, agar konsisten dengan logika update
     picturePath = `/uploads/category/${req.files.pictures[0].filename}`;
+    const fullPath = path.join(__dirname, "..", picturePath);
+
+    // Compress image
+    await compressImage(fullPath);
   }
 
   try {
@@ -991,12 +1214,27 @@ exports.addCategory = async (req, res) => {
       category_image: picturePath, // Simpan path string, bukan array
       category_display_order: order,
     });
+    await createActivityLog(
+      req,
+      req.user,
+      "CREATE",
+      { type: "Category", id: category.category_id },
+      { newData: category.toJSON() }
+    );
     res.status(201).json(category);
   } catch (error) {
     if (picturePath) {
       // Hapus file yang baru diunggah jika terjadi error
       deleteFiles([picturePath], "category");
     }
+    await createActivityLog(
+      req,
+      req.user,
+      "CREATE",
+      { type: "Category", id: "N/A" },
+      { error: error.message, attemptedData: req.body },
+      "FAILED"
+    );
     res.status(500).json({ message: error.message });
   }
 };
@@ -1009,6 +1247,10 @@ exports.updateCategory = async (req, res) => {
   let newPicturePath = null;
   if (req.files && req.files.pictures && req.files.pictures.length > 0) {
     newPicturePath = `/uploads/category/${req.files.pictures[0].filename}`;
+    const fullPath = path.join(__dirname, "..", newPicturePath);
+
+    // Compress image
+    await compressImage(fullPath);
   }
   try {
     const category = await Category.findByPk(req.params.id);
@@ -1019,6 +1261,7 @@ exports.updateCategory = async (req, res) => {
       return res.status(404).json({ message: "Category not found" });
     }
     const oldPicturePath = category.category_image;
+    const oldData = category.toJSON();
     const updateData = {
       category_name,
       category_image: oldPicturePath,
@@ -1036,10 +1279,35 @@ exports.updateCategory = async (req, res) => {
       }
     }
 
+    const changes = {};
+    for (const key in updateData) {
+      if (String(updateData[key]) !== String(oldData[key])) {
+        changes[key] = { before: oldData[key], after: updateData[key] };
+      }
+    }
+
     await category.update(updateData);
+
+    if (Object.keys(changes).length > 0) {
+      await createActivityLog(
+        req,
+        req.user,
+        "UPDATE",
+        { type: "Category", id: req.params.id },
+        changes
+      );
+    }
 
     res.status(200).json(category);
   } catch (error) {
+    await createActivityLog(
+      req,
+      req.user,
+      "UPDATE",
+      { type: "Category", id: req.params.id },
+      { error: error.message, attemptedChanges: req.body },
+      "FAILED"
+    );
     res.status(500).json({ message: error.message });
   }
 };
@@ -1054,6 +1322,10 @@ exports.reorderCategories = async (req, res) => {
 
   const t = await sequelize.transaction();
   try {
+    const oldCategories = await Category.findAll({
+      order: [["category_display_order", "ASC"]],
+      transaction: t,
+    });
     for (const item of order) {
       await Category.update(
         { category_display_order: item.display_order },
@@ -1061,9 +1333,40 @@ exports.reorderCategories = async (req, res) => {
       );
     }
     await t.commit();
+
+    const oldOrderMap = oldCategories.reduce((acc, cat) => {
+      acc[cat.category_id] = cat.category_display_order;
+      return acc;
+    }, {});
+
+    let hasChanges = false;
+    for (const item of order) {
+      if (oldOrderMap[item.category_id] !== item.display_order) {
+        hasChanges = true;
+        break;
+      }
+    }
+
+    if (hasChanges) {
+      await createActivityLog(
+        req,
+        req.user,
+        "UPDATE",
+        { type: "Category", id: "bulk-reorder" },
+        { before: oldCategories.map((c) => c.toJSON()), after: order }
+      );
+    }
     res.status(200).json({ message: "Urutan kategori berhasil diperbarui." });
   } catch (error) {
     await t.rollback();
+    await createActivityLog(
+      req,
+      req.user,
+      "UPDATE",
+      { type: "Category", id: "bulk-reorder" },
+      { error: error.message, attemptedChanges: req.body },
+      "FAILED"
+    );
     console.error("Gagal memperbarui urutan kategori:", error);
     res.status(500).json({ message: "Gagal memperbarui urutan kategori." });
   }
@@ -1076,14 +1379,32 @@ exports.deleteCategory = async (req, res) => {
       return res.status(404).json({ message: "Category not found" });
     }
 
+    const deletedData = category.toJSON();
+
     // Hapus gambar terkait jika ada sebelum menghapus record
     if (category.category_image) {
       deleteFiles([category.category_image], "category");
     }
 
     await category.destroy();
+
+    await createActivityLog(
+      req,
+      req.user,
+      "DELETE",
+      { type: "Category", id: req.params.id },
+      { deletedData }
+    );
     res.status(200).json({ message: "Category deleted" });
   } catch (error) {
+    await createActivityLog(
+      req,
+      req.user,
+      "DELETE",
+      { type: "Category", id: req.params.id },
+      { error: error.message },
+      "FAILED"
+    );
     res.status(500).json({ message: error.message });
   }
 };
@@ -1186,10 +1507,10 @@ exports.getAllCategoryOnTiktokShop = async (req, res) => {
       tiktokResponse.data &&
       tiktokResponse.data.categories
     ) {
-      res.status(200).json(tiktokResponse.data.categories);
+      return res.status(200).json(tiktokResponse.data.categories);
     } else {
       // Kasus ini menangani jika API mengembalikan respons sukses tetapi tanpa struktur data yang diharapkan.
-      res.status(200).json([]);
+      return res.status(200).json([]);
     }
   } catch (error) {
     // Error dari service adalah body respons dari API TikTok.
@@ -1198,7 +1519,7 @@ exports.getAllCategoryOnTiktokShop = async (req, res) => {
     const statusCode =
       error.code && String(error.code).startsWith("4") ? 400 : 500;
 
-    res.status(statusCode).json({
+    return res.status(statusCode).json({
       message: "Gagal mengambil kategori dari TikTok Shop.",
       details: error,
     });
@@ -1226,7 +1547,7 @@ exports.getCategoryAttributesOnTiktokShop = async (req, res) => {
       res.status(200).json(tiktokResponse.data.attributes);
     } else {
       // Menangani kasus jika API mengembalikan sukses tetapi tanpa atribut
-      res.status(200).json([]);
+      return res.status(200).json([]);
     }
   } catch (error) {
     // Error dari service adalah body respons dari API TikTok.
@@ -1238,7 +1559,7 @@ exports.getCategoryAttributesOnTiktokShop = async (req, res) => {
     const statusCode =
       error.code && String(error.code).startsWith("4") ? 400 : 500;
 
-    res.status(statusCode).json({
+    return res.status(statusCode).json({
       message: "Gagal mengambil atribut kategori dari TikTok Shop.",
       details: error,
     });
@@ -1343,15 +1664,18 @@ exports.updateProductInline = async (req, res) => {
       return res.status(404).json({ message: "Produk tidak ditemukan" });
     }
 
-    const oldStock = product.product_stock;
+    // Capture old values before any changes
+    const oldValues = {
+      product_price: product.product_price,
+      product_price_tiktok: product.product_price_tiktok,
+      product_stock: product.product_stock,
+    };
 
-    // Update only the fields that are provided
+    // Apply new values to the instance
     if (price !== undefined) {
-      // Jika harga kosong, simpan sebagai NULL, bukan 0, agar sesuai dengan skema DB.
       product.product_price = price;
     }
     if (product_price_tiktok !== undefined) {
-      // Lakukan hal yang sama untuk harga TikTok untuk mencegah error
       product.product_price_tiktok =
         product_price_tiktok === "" ? null : product_price_tiktok;
     }
@@ -1359,15 +1683,38 @@ exports.updateProductInline = async (req, res) => {
       product.product_stock = stock;
     }
 
-    await product.save();
+    // Use Sequelize's `changed()` to see what was modified
+    const changedFields = product.changed();
 
-    // Sync stock to TikTok if it has changed and the product is linked
-    if (
-      stock !== undefined &&
-      stock !== oldStock &&
-      product.product_tiktok_id
-    ) {
-      exports.syncStockToTiktok(product.product_id, stock);
+    if (changedFields && changedFields.length > 0) {
+      // Build the log details from our captured old values and the new values
+      const changesForLog = {};
+      changedFields.forEach((field) => {
+        changesForLog[field] = {
+          before: oldValues[field],
+          after: product[field],
+        };
+      });
+
+      // Save the changes to the database
+      await product.save();
+
+      // Log the activity
+      await createActivityLog(
+        req,
+        req.user,
+        "UPDATE",
+        { type: "Product", id: id },
+        changesForLog
+      );
+
+      // Sync stock to TikTok if it has changed and the product is linked
+      if (
+        changedFields.includes("product_stock") &&
+        product.product_tiktok_id
+      ) {
+        exports.syncStockToTiktok(product.product_id, product.product_stock);
+      }
     }
 
     res.status(200).json({
@@ -1376,6 +1723,14 @@ exports.updateProductInline = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating product inline:", error);
+    await createActivityLog(
+      req,
+      req.user,
+      "UPDATE",
+      { type: "Product", id: id },
+      { error: error.message, attemptedChanges: req.body },
+      "FAILED"
+    );
     res.status(500).json({ message: "Gagal memperbarui produk." });
   }
 };
@@ -1408,6 +1763,15 @@ exports.updateDiscountStatus = async (req, res) => {
     if (!product) {
       return res.status(404).json({ message: "Produk tidak ditemukan." });
     }
+
+    const oldData = {
+      product_is_discount: product.product_is_discount,
+      product_discount_status: product.product_discount_status,
+      product_discount_percentage: product.product_discount_percentage,
+      product_discount_price: product.product_discount_price,
+      product_discount_start_date: product.product_discount_start_date,
+      product_discount_end_date: product.product_discount_end_date,
+    };
 
     // Case 1: Setting the product to be part of the discount program
     if (is_discount !== undefined) {
@@ -1448,9 +1812,51 @@ exports.updateDiscountStatus = async (req, res) => {
     }
 
     await product.save();
+
+    const newData = {
+      product_is_discount: product.product_is_discount,
+      product_discount_status: product.product_discount_status,
+      product_discount_percentage: product.product_discount_percentage,
+      product_discount_price: product.product_discount_price,
+      product_discount_start_date: product.product_discount_start_date,
+      product_discount_end_date: product.product_discount_end_date,
+    };
+
+    const changes = {};
+    for (const key in newData) {
+      // Handle date comparison correctly by converting to string
+      const oldValueStr = oldData[key]
+        ? new Date(oldData[key]).toISOString()
+        : null;
+      const newValueStr = newData[key]
+        ? new Date(newData[key]).toISOString()
+        : null;
+
+      if (oldValueStr !== newValueStr) {
+        changes[key] = { before: oldData[key], after: newData[key] };
+      }
+    }
+
+    if (Object.keys(changes).length > 0) {
+      await createActivityLog(
+        req,
+        req.user,
+        "UPDATE",
+        { type: "ProductDiscount", id: id },
+        changes
+      );
+    }
     res.status(200).json({ message: `Diskon produk berhasil diperbarui.` });
   } catch (error) {
     console.error("Error updating discount status:", error);
+    await createActivityLog(
+      req,
+      req.user,
+      "UPDATE",
+      { type: "ProductDiscount", id: id },
+      { error: error.message, attemptedChanges: req.body },
+      "FAILED"
+    );
     res.status(500).json({ message: "Gagal memperbarui status diskon." });
   }
 };
@@ -1484,6 +1890,15 @@ exports.updateMultipleDiscountStatus = async (req, res) => {
       transaction: t,
     });
 
+    const oldData = products.map((p) => ({
+      product_id: p.product_id,
+      product_is_discount: p.product_is_discount,
+      product_discount_percentage: p.product_discount_percentage,
+      product_discount_price: p.product_discount_price,
+      product_discount_start_date: p.product_discount_start_date,
+      product_discount_end_date: p.product_discount_end_date,
+    }));
+
     for (const product of products) {
       product.product_is_discount = true;
       product.product_discount_percentage = percentage;
@@ -1496,11 +1911,64 @@ exports.updateMultipleDiscountStatus = async (req, res) => {
     }
 
     await t.commit();
+
+    const newProducts = await Product.findAll({
+      where: { product_id: { [Op.in]: productIds } },
+    });
+    const newData = newProducts.map((p) => ({
+      product_id: p.product_id,
+      product_is_discount: p.product_is_discount,
+      product_discount_percentage: p.product_discount_percentage,
+      product_discount_price: p.product_discount_price,
+      product_discount_start_date: p.product_discount_start_date,
+      product_discount_end_date: p.product_discount_end_date,
+    }));
+
+    const oldDataMap = oldData.reduce((acc, p) => {
+      acc[p.product_id] = p;
+      return acc;
+    }, {});
+
+    const changes = {};
+    newData.forEach((newProduct) => {
+      const oldProduct = oldDataMap[newProduct.product_id];
+      const productChanges = {};
+      for (const key in newProduct) {
+        if (String(newProduct[key]) !== String(oldProduct[key])) {
+          productChanges[key] = {
+            before: oldProduct[key],
+            after: newProduct[key],
+          };
+        }
+      }
+      if (Object.keys(productChanges).length > 0) {
+        changes[newProduct.product_id] = productChanges;
+      }
+    });
+
+    if (Object.keys(changes).length > 0) {
+      await createActivityLog(
+        req,
+        req.user,
+        "UPDATE",
+        { type: "ProductDiscount", id: "bulk-update" },
+        changes
+      );
+    }
+
     res
       .status(200)
       .json({ message: `${products.length} produk berhasil diberi diskon.` });
   } catch (error) {
     await t.rollback();
+    await createActivityLog(
+      req,
+      req.user,
+      "UPDATE",
+      { type: "ProductDiscount", id: "bulk-update" },
+      { error: error.message, attemptedChanges: req.body },
+      "FAILED"
+    );
     console.error("Error updating multiple discount statuses:", error);
     res.status(500).json({ message: "Gagal memperbarui status diskon." });
   }
@@ -1520,6 +1988,14 @@ exports.deleteDiscount = async (req, res) => {
       return res.status(404).json({ message: "Produk tidak ditemukan." });
     }
 
+    const oldData = {
+      product_is_discount: product.product_is_discount,
+      product_discount_price: product.product_discount_price,
+      product_discount_percentage: product.product_discount_percentage,
+      product_discount_start_date: product.product_discount_start_date,
+      product_discount_end_date: product.product_discount_end_date,
+    };
+
     // Set is_discount to false and clear all discount-related fields
     product.product_is_discount = false;
     product.product_discount_price = null;
@@ -1529,9 +2005,42 @@ exports.deleteDiscount = async (req, res) => {
 
     await product.save();
 
+    const newData = {
+      product_is_discount: product.product_is_discount,
+      product_discount_price: product.product_discount_price,
+      product_discount_percentage: product.product_discount_percentage,
+      product_discount_start_date: product.product_discount_start_date,
+      product_discount_end_date: product.product_discount_end_date,
+    };
+
+    const changes = {};
+    for (const key in newData) {
+      if (String(newData[key]) !== String(oldData[key])) {
+        changes[key] = { before: oldData[key], after: newData[key] };
+      }
+    }
+
+    if (Object.keys(changes).length > 0) {
+      await createActivityLog(
+        req,
+        req.user,
+        "DELETE",
+        { type: "ProductDiscount", id: id },
+        changes
+      );
+    }
+
     res.status(200).json({ message: "Diskon untuk produk telah dihapus." });
   } catch (error) {
     console.error("Error deleting discount:", error);
+    await createActivityLog(
+      req,
+      req.user,
+      "DELETE",
+      { type: "ProductDiscount", id: id },
+      { error: error.message },
+      "FAILED"
+    );
     res.status(500).json({ message: "Gagal menghapus diskon." });
   }
 };
@@ -1557,5 +2066,200 @@ exports.getProductsByIds = async (req, res) => {
     res.status(200).json(products.map(parseProductJSONFields));
   } catch (error) {
     res.status(500).json({ message: "Gagal mengambil data produk." });
+  }
+};
+
+/**
+ * Internal helper function to upload a single product to TikTok.
+ * This function contains the core logic and is not an Express handler.
+ * @param {string} productId - The local product ID (e.g., 'PD00001').
+ * @returns {Promise<Product>} The updated product instance from Sequelize.
+ * @throws {Error} If the upload process fails at any step.
+ */
+const _uploadSingleProductToTiktok = async (productId, listingPlatforms) => {
+  const product = await Product.findByPk(productId);
+
+  if (!product) {
+    throw new Error(`Produk dengan ID ${productId} tidak ditemukan.`);
+  }
+
+  if (
+    !product.product_categories_tiktok ||
+    !product.product_attributes_tiktok ||
+    !product.product_pictures
+  ) {
+    throw new Error(
+      `Data produk ${productId} tidak lengkap (kategori/atribut/gambar).`
+    );
+  }
+
+  const {
+    createProduct: createTiktokProduct,
+    uploadImage: uploadTiktokImage,
+  } = require("../services/tiktokShop");
+
+  // 1. Upload images
+  let imageUris = [];
+  const pictures = JSON.parse(product.product_pictures);
+  if (pictures && pictures.length > 0) {
+    const uploadPromises = pictures
+      .map((fileUrl) => {
+        const filePath = path.join(__dirname, "..", fileUrl.substring(1));
+        if (!fs.existsSync(filePath)) {
+          console.warn(`File gambar tidak ditemukan, dilewati: ${filePath}`);
+          return null;
+        }
+        const imageBuffer = fs.readFileSync(filePath);
+        return uploadTiktokImage(imageBuffer);
+      })
+      .filter(Boolean);
+
+    const uploadResults = await Promise.all(uploadPromises);
+    imageUris = uploadResults
+      .map((res) => (res?.data?.uri ? { uri: res.data.uri } : null))
+      .filter(Boolean);
+  }
+
+  if (imageUris.length === 0) {
+    throw new Error(`Gagal mengunggah gambar untuk produk ${productId}.`);
+  }
+
+  // 2. Prepare payload
+  const parsedDimensions = JSON.parse(product.product_dimensions);
+  const tiktokPayload = {
+    title: product.product_name,
+    is_cod_allowed: false,
+    external_product_id: product.product_id,
+    description: product.product_description,
+    category_id: product.product_categories_tiktok,
+    main_images: imageUris,
+    product_attributes: JSON.parse(product.product_attributes_tiktok),
+    package_dimensions: {
+      length: parsedDimensions.length,
+      width: parsedDimensions.width,
+      height: parsedDimensions.height,
+      unit: "CENTIMETER",
+    },
+    package_weight: { value: String(product.product_weight), unit: "KILOGRAM" },
+    skus: [
+      {
+        price: {
+          amount: String(product.product_price_tiktok || product.product_price),
+          currency: "IDR",
+        },
+        inventory: [
+          {
+            warehouse_id: String(process.env.TIKPED_WAREHOUSE_ID),
+            quantity: parseInt(product.product_stock, 10),
+          },
+        ],
+        seller_sku: product.product_sku,
+      },
+    ],
+    listing_platforms:
+      listingPlatforms ||
+      (product.product_listing_platforms
+        ? JSON.parse(product.product_listing_platforms)
+        : ["TOKOPEDIA", "TIKTOK_SHOP"]),
+  };
+
+  // 3. Create product on TikTok
+  const tiktokResponse = await createTiktokProduct(tiktokPayload);
+  if (!tiktokResponse?.data?.product_id) {
+    throw new Error(
+      `Gagal membuat produk ${productId} di TikTok: ${
+        tiktokResponse?.message || "Unknown error"
+      }`
+    );
+  }
+
+  // 4. Update local DB
+  await product.update({
+    product_tiktok_id: tiktokResponse.data.product_id,
+    product_tiktok_sku_id: tiktokResponse.data.skus[0].id,
+  });
+
+  return product;
+};
+
+/**
+ * @description Upload multiple existing products to TikTok Shop.
+ * @route POST /api/products/admin/upload-to-tiktok/bulk
+ * @access Admin
+ */
+exports.uploadMultipleProductsToTiktok = async (req, res) => {
+  const { productIds, listingPlatforms } = req.body;
+
+  if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
+    return res.status(400).json({ message: "Product IDs are required." });
+  }
+
+  let successCount = 0;
+  let failureCount = 0;
+  const errors = [];
+
+  for (const productId of productIds) {
+    try {
+      // Memanggil helper function yang sudah direfaktor
+      await _uploadSingleProductToTiktok(productId, listingPlatforms);
+      successCount++;
+    } catch (error) {
+      failureCount++;
+      errors.push({ productId, error: error.message });
+      console.error(`❌ Gagal mengunggah produk ${productId}:`, error.message);
+    }
+  }
+
+  res.status(200).json({
+    message: `Proses unggah massal selesai. Berhasil: ${successCount}, Gagal: ${failureCount}.`,
+    successCount,
+    failureCount,
+    errors,
+  });
+};
+
+/**
+ * @description Get products for the TikTok upload page.
+ * @route GET /api/products/admin/for-tiktok-page
+ * @access Admin
+ */
+exports.getProductsForTiktokPage = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search } = req.query;
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const offset = (pageNum - 1) * limitNum;
+
+    let whereClause = {
+      product_status: "active", // Only active products
+      // Also ensure it has the necessary data for TikTok
+      product_categories_tiktok: { [Op.not]: null, [Op.ne]: "" },
+      product_attributes_tiktok: { [Op.not]: null, [Op.ne]: "[]" },
+    };
+
+    if (search) {
+      whereClause[Op.or] = {
+        product_name: { [Op.like]: `%${search}%` },
+        product_sku: { [Op.like]: `%${search}%` },
+      };
+    }
+
+    const { count, rows } = await Product.findAndCountAll({
+      where: whereClause,
+      include: [{ model: Category, as: "category" }],
+      limit: limitNum,
+      offset: offset,
+      order: [["product_id", "DESC"]],
+    });
+
+    res.status(200).json({
+      data: rows.map(parseProductJSONFields),
+      totalPages: Math.ceil(count / limitNum),
+      currentPage: pageNum,
+      totalProducts: count,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };

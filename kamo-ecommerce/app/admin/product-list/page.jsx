@@ -82,7 +82,9 @@ const ProductList = () => {
           : "product_stock"
       ];
     setEditValue(
-      field.includes("price") ? formatNumber(initialValue) : initialValue
+      field.includes("price")
+        ? formatNumber(initialValue)
+        : String(initialValue ?? "")
     );
   };
 
@@ -420,7 +422,7 @@ const ProductList = () => {
                                 ? `${product.product_name.substring(0, 25)}...`
                                 : product.product_name}
                             </div>
-                            <div className="text-sm text-gray-500">
+                            <div className="text-xs text-gray-500">
                               ID: {product.product_id} || SKU:{" "}
                               {product.product_sku}
                             </div>
@@ -428,7 +430,7 @@ const ProductList = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap hidden md:table-cell">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-xs text-gray-900">
                           {product.category?.category_name || "-"}
                         </div>
                       </td>
@@ -449,7 +451,7 @@ const ProductList = () => {
                             onDoubleClick={() =>
                               handleDoubleClick(product, "price")
                             }
-                            className="min-w-28 text-sm text-gray-900 font-medium px-2 py-1 border border-transparent rounded-md cursor-pointer hover:bg-gray-100"
+                            className="min-w-28 text-xs text-gray-900 font-medium px-2 py-1 border border-transparent rounded-md cursor-pointer hover:bg-gray-100"
                             title="Double-click untuk edit"
                           >
                             Rp{" "}
@@ -476,7 +478,7 @@ const ProductList = () => {
                             onDoubleClick={() =>
                               handleDoubleClick(product, "product_price_tiktok")
                             }
-                            className="min-w-28 text-sm text-gray-900 font-medium px-2 py-1 border border-transparent rounded-md cursor-pointer hover:bg-gray-100"
+                            className="min-w-28 text-xs text-gray-900 font-medium px-2 py-1 border border-transparent rounded-md cursor-pointer hover:bg-gray-100"
                             title="Double-click untuk edit"
                           >
                             Rp{" "}
@@ -503,7 +505,7 @@ const ProductList = () => {
                             onDoubleClick={() =>
                               handleDoubleClick(product, "stock")
                             }
-                            className="min-w-10 text-sm text-gray-900 px-2 py-1 border border-transparent rounded-md cursor-pointer hover:bg-gray-100"
+                            className="min-w-10 text-xs text-gray-900 px-2 py-1 border border-transparent rounded-md cursor-pointer hover:bg-gray-100"
                             title="Double-click untuk edit"
                           >
                             {product.product_stock ?? 0}
@@ -546,11 +548,11 @@ const ProductList = () => {
                               className="px-3 py-1 bg-accent text-white rounded text-xs cursor-pointer hover:bg-accent/90 transition-colors"
                               onClick={() => handleCheckTiktokStatus(product)}
                             >
-                              Cek Status TikTok
+                              Cek Status
                             </button>
                           ) : (
                             <span className="text-xs text-gray-400 italic">
-                              Tidak terhubung TikTok
+                              Tidak terhubung
                             </span>
                           )
                         ) : (

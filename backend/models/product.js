@@ -66,6 +66,7 @@ module.exports = (sequelize, DataTypes) => {
       product_weight: DataTypes.FLOAT,
       product_dimensions: DataTypes.TEXT,
       product_pictures: DataTypes.TEXT,
+      product_listing_platforms: DataTypes.TEXT,
       product_is_discount: {
         type: DataTypes.BOOLEAN,
         defaultValue: false,

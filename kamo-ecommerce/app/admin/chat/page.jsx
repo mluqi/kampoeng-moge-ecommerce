@@ -1,11 +1,12 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import api from "@/service/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdminChat } from "@/contexts/AdminChatContext";
 import ConversationList from "@/components/admin/ConversationList";
 import ChatWindow from "@/components/admin/ChatWindow";
 import Loading from "@/components/Loading";
+import { FaSearch } from "react-icons/fa";
 
 const AdminChatPage = () => {
   const { admin } = useAuth(); // Mengambil data admin yang sedang login
@@ -18,6 +19,7 @@ const AdminChatPage = () => {
   const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [messages, setMessages] = useState(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // [BARU] Polling untuk pesan baru di jendela chat yang aktif
   useEffect(() => {
@@ -115,6 +117,20 @@ const AdminChatPage = () => {
     }
   };
 
+  // Filter percakapan berdasarkan searchTerm
+  const filteredConversations = useMemo(() => {
+    if (!searchTerm) {
+      return conversations;
+    }
+    return conversations.filter(
+      (convo) =>
+        convo.user?.user_name
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        convo.user?.user_email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [conversations, searchTerm]);
+
   if (loadingConversations) {
     return <Loading />;
   }
@@ -125,10 +141,25 @@ const AdminChatPage = () => {
       <div
         className={`${
           selectedConversationId ? "hidden md:block" : "block"
-        } w-full md:w-1/3 md:max-w-sm`}
+        } w-full md:w-1/3 md:max-w-sm flex flex-col h-full bg-white border-r`}
       >
+        <div className="p-4 border-b">
+          <h2 className="text-lg font-semibold text-gray-800 mb-3">
+            Percakapan
+          </h2>
+          <div className="relative">
+            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Cari pengguna (nama/email)..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full p-2 pl-10 border rounded-md bg-gray-50 focus:ring-accent focus:border-accent"
+            />
+          </div>
+        </div>
         <ConversationList
-          conversations={conversations}
+          conversations={filteredConversations}
           selectedConversationId={selectedConversationId}
           onSelectConversation={handleSelectConversation}
         />

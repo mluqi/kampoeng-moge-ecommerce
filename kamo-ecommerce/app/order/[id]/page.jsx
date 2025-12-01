@@ -13,6 +13,7 @@ import ReviewModal from "@/components/ReviewModal";
 import { assets } from "@/assets/assets";
 import toast from "react-hot-toast";
 import PaymentIframe from "../../../components/PaymentIframe";
+import ConfirmationModal from "@/components/ConfirmationModal";
 
 const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -29,6 +30,9 @@ const OrderDetailContent = () => {
   const [isReviewModalOpen, setReviewModalOpen] = useState(false);
   const [selectedItemForReview, setSelectedItemForReview] = useState(null);
   const [showPaymentIframe, setShowPaymentIframe] = useState(false);
+  const [showCompleteConfirmModal, setShowCompleteConfirmModal] =
+    useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
 
   const fetchOrderDetails = useCallback(async () => {
     if (!id) return;
@@ -77,6 +81,22 @@ const OrderDetailContent = () => {
       toast.error(
         error?.response?.data?.message || "Gagal mengajukan pembatalan."
       );
+    }
+  };
+
+  const handleCompleteOrder = async () => {
+    setIsCompleting(true);
+    try {
+      await api.put(`/orders/${order.order_id}/complete`);
+      toast.success("Pesanan berhasil diselesaikan!");
+      setShowCompleteConfirmModal(false);
+      fetchOrderDetails(); // Refresh order details
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Gagal menyelesaikan pesanan."
+      );
+    } finally {
+      setIsCompleting(false);
     }
   };
 
@@ -181,6 +201,19 @@ const OrderDetailContent = () => {
                 Permintaan pembatalan sedang diproses admin.
               </div>
             )}
+            {order.status === "shipped" && (
+              <button
+                onClick={() => setShowCompleteConfirmModal(true)}
+                className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors"
+              >
+                Selesaikan Pesanan
+              </button>
+            )}
+            {order.status === "cancellation_requested" && (
+              <div className="w-full bg-yellow-100 text-yellow-800 px-4 py-2 rounded-md text-sm font-medium">
+                Permintaan pembatalan sedang diproses admin.
+              </div>
+            )}
           </div>
         </div>
 
@@ -268,7 +301,13 @@ const OrderDetailContent = () => {
 
         {/* Order Status Tracker */}
         <div className="mb-8">
-          <OrderStatusTracker orderId={order.order_id} status={order.status} shippingNumber={order.shipping_number} />
+          <OrderStatusTracker
+            orderId={order.order_id}
+            status={order.status}
+            shippingNumber={order.shipping_number}
+            createdAt={order.createdAt}
+            updatedAt={order.updatedAt}
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -445,6 +484,19 @@ const OrderDetailContent = () => {
           </div>
         </div>
       )}
+
+      {/* Modal Konfirmasi Selesaikan Pesanan */}
+      <ConfirmationModal
+        isOpen={showCompleteConfirmModal}
+        onClose={() => setShowCompleteConfirmModal(false)}
+        onConfirm={handleCompleteOrder}
+        title="Selesaikan Pesanan"
+        message="Apakah Anda yakin ingin menyelesaikan pesanan ini? Pastikan Anda telah menerima dan memeriksa semua produk. Tindakan ini tidak dapat dibatalkan."
+        confirmText="Ya, Selesaikan"
+        cancelText="Batal"
+        confirmButtonClass="bg-green-600 hover:bg-green-700"
+        isConfirming={isCompleting}
+      />
     </div>
   );
 };

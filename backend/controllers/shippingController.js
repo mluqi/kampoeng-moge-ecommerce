@@ -82,10 +82,13 @@ exports.getShippingRates = async (req, res) => {
       });
     }
 
+    // Bulatkan berat ke atas ke kilogram berikutnya, dengan minimum 1 kg.
+    const finalWeight = Math.max(1, Math.ceil(parseFloat(weight)));
+
     const jneResponse = await getJnePrice({
       from: fromTariffCode,
       thru: thruTariffCode,
-      weight: parseFloat(weight),
+      weight: finalWeight,
     });
 
     if (jneResponse?.price?.length > 0) {

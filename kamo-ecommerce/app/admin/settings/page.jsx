@@ -68,6 +68,18 @@ const SettingsPage = () => {
         toast.error("Failed to fetch active shipping services.");
       }
     };
+    const fetchCategoryColour = async () => {
+      try {
+        const response = await api.get("/settings/category_colour");
+        if (response.status === 200) {
+          setCategoryColor(response.data.value || "#000000");
+        }
+      } catch (error) {
+        console.error("Failed to fetch category colour:", error.message);
+        toast.error("Failed to fetch category colour.");
+      }
+    };
+    fetchCategoryColour();
 
     fetchActiveServices();
   }, []);

@@ -6,6 +6,7 @@ const {
   createOrder,
   getOrderById,
   cancelOrder,
+  completeOrder,
   getAllOrdersAdmin,
   getOrderByIdAdmin,
   updateOrderStatus,
@@ -21,6 +22,7 @@ router.get("/", getOrders);
 router.post("/", createOrder);
 router.get("/:id", getOrderById);
 router.put("/:id/cancel", cancelOrder);
+router.put("/:id/complete", completeOrder);
 
 // --- ADMIN ROUTES ---
 router.get("/admin/all", authMiddleware, getAllOrdersAdmin);

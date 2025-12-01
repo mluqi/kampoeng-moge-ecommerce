@@ -4,6 +4,7 @@ const qs = require("qs");
 const crypto = require("crypto");
 const FormData = require("form-data");
 
+const { createApiLog } = require("./apiLogService");
 const { integration_tokens: TiktokToken } = require("../models");
 
 const {
@@ -128,10 +129,7 @@ const generateSign = (url, params, body, contentType, appSecret) => {
 
   let signString = `${pathname}${sortedParams}`;
 
-  if (
-    contentType !== "multipart/form-data" &&
-    body
-  ) {
+  if (contentType !== "multipart/form-data" && body) {
     signString += JSON.stringify(body);
   }
 
@@ -147,6 +145,7 @@ const generateSign = (url, params, body, contentType, appSecret) => {
  * Generic POST caller for TikTok API with signature generation
  */
 const postToTiktok = async (path, body = {}, queryParams = {}) => {
+  const startTime = Date.now();
   const accessToken = await getValidAccessToken();
   const timestamp = Math.floor(Date.now() / 1000);
   const fullUrl = `${API_URL}${path}`;
@@ -172,11 +171,32 @@ const postToTiktok = async (path, body = {}, queryParams = {}) => {
       },
     });
 
+    await createApiLog({
+      serviceName: "TIKTOK_SHOP",
+      endpoint: path,
+      requestPayload: { query: finalParams, body: body },
+      responsePayload: response.data,
+      status: "SUCCESS",
+      durationMs: Date.now() - startTime,
+    });
+
     console.log(`[TikTok API] ✅ Success POST ${path}`);
     return response.data;
   } catch (err) {
     const errorData = err.response?.data || err.message;
     console.error(`[TikTok API] ❌ Error POST ${path}:`, errorData);
+
+    await createApiLog({
+      serviceName: "TIKTOK_SHOP",
+      endpoint: path,
+      requestPayload: { query: finalParams, body: body },
+      responsePayload: errorData,
+      status: "FAILED",
+      errorMessage:
+        typeof errorData === "string" ? errorData : errorData?.message,
+      durationMs: Date.now() - startTime,
+    });
+
     throw errorData;
   }
 };
@@ -188,6 +208,7 @@ const postToTiktok = async (path, body = {}, queryParams = {}) => {
  * @returns {Promise<Object>} TikTok API response.
  */
 const uploadImage = async (imageBuffer, useCase = "MAIN_IMAGE") => {
+  const startTime = Date.now();
   const accessToken = await getValidAccessToken();
   const path = "/product/202309/images/upload";
   const timestamp = Math.floor(Date.now() / 1000);
@@ -220,11 +241,32 @@ const uploadImage = async (imageBuffer, useCase = "MAIN_IMAGE") => {
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
     });
+
+    await createApiLog({
+      serviceName: "TIKTOK_SHOP",
+      endpoint: path,
+      requestPayload: { use_case: useCase, query: finalParams },
+      responsePayload: response.data,
+      status: "SUCCESS",
+      durationMs: Date.now() - startTime,
+    });
+
     console.log(`[TikTok API] ✅ Success POST ${path}`);
     return response.data;
   } catch (err) {
     const errorData = err.response?.data || err.message;
     console.error(`[TikTok API] ❌ Error POST ${path}:`, errorData);
+
+    await createApiLog({
+      serviceName: "TIKTOK_SHOP",
+      endpoint: path,
+      requestPayload: { use_case: useCase, query: finalParams },
+      responsePayload: errorData,
+      status: "FAILED",
+      errorMessage:
+        typeof errorData === "string" ? errorData : errorData?.message,
+      durationMs: Date.now() - startTime,
+    });
     throw errorData;
   }
 };
@@ -241,6 +283,7 @@ const createProduct = async (productData) => {
  * Generic PUT caller for TikTok API with signature generation
  */
 const putToTiktok = async (path, body = {}) => {
+  const startTime = Date.now();
   const accessToken = await getValidAccessToken();
   const timestamp = Math.floor(Date.now() / 1000);
   const fullUrl = `${API_URL}${path}`;
@@ -264,11 +307,31 @@ const putToTiktok = async (path, body = {}) => {
       },
     });
 
+    await createApiLog({
+      serviceName: "TIKTOK_SHOP",
+      endpoint: path,
+      requestPayload: { query: finalParams, body: body },
+      responsePayload: response.data,
+      status: "SUCCESS",
+      durationMs: Date.now() - startTime,
+    });
+
     console.log(`[TikTok API] ✅ Success PUT ${path}`);
     return response.data;
   } catch (err) {
     const errorData = err.response?.data || err.message;
     console.error(`[TikTok API] ❌ Error PUT ${path}:`, errorData);
+
+    await createApiLog({
+      serviceName: "TIKTOK_SHOP",
+      endpoint: path,
+      requestPayload: { query: finalParams, body: body },
+      responsePayload: errorData,
+      status: "FAILED",
+      errorMessage:
+        typeof errorData === "string" ? errorData : errorData?.message,
+      durationMs: Date.now() - startTime,
+    });
     throw errorData;
   }
 };
@@ -277,6 +340,7 @@ const putToTiktok = async (path, body = {}) => {
  * Generic GET caller for TikTok API with signature generation
  */
 const getFromTiktok = async (path, queryParams = {}) => {
+  const startTime = Date.now();
   const accessToken = await getValidAccessToken();
   const timestamp = Math.floor(Date.now() / 1000);
   const fullUrl = `${API_URL}${path}`;
@@ -306,11 +370,31 @@ const getFromTiktok = async (path, queryParams = {}) => {
       },
     });
 
+    await createApiLog({
+      serviceName: "TIKTOK_SHOP",
+      endpoint: path,
+      requestPayload: { query: finalParams },
+      responsePayload: response.data,
+      status: "SUCCESS",
+      durationMs: Date.now() - startTime,
+    });
+
     console.log(`[TikTok API] ✅ Success GET ${path}`);
     return response.data;
   } catch (err) {
     const errorData = err.response?.data || err.message;
     console.error(`[TikTok API] ❌ Error GET ${path}:`, errorData);
+
+    await createApiLog({
+      serviceName: "TIKTOK_SHOP",
+      endpoint: path,
+      requestPayload: { query: finalParams },
+      responsePayload: errorData,
+      status: "FAILED",
+      errorMessage:
+        typeof errorData === "string" ? errorData : errorData?.message,
+      durationMs: Date.now() - startTime,
+    });
     throw errorData;
   }
 };
@@ -473,7 +557,7 @@ const getOrderDetails = async (orderIds) => {
   const path = "/order/202309/orders";
   const queryParams = {
     // API v202309 expects a comma-separated string for multiple IDs.
-    ids: orderIds.join(','),
+    ids: orderIds.join(","),
     version: "202309",
   };
   return getFromTiktok(path, queryParams);

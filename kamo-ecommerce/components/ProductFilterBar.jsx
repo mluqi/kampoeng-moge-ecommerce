@@ -160,7 +160,7 @@ export default function ProductFilterBar({
                   className="relative z-10 font-medium text-sm drop-shadow-md mb-1 ml-3"
                   style={{ color: categoryColor }}
                 >
-                  {slide.label}
+                  {slide.label.length > 15 ? `${slide.label.substring(0, 12)}...` : slide.label}
                 </span>
               </motion.button>
             ))}

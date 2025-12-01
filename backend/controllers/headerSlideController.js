@@ -1,6 +1,7 @@
 const { header_slides: HeaderSlide } = require("../models");
 const fs = require("fs");
 const path = require("path");
+const { createActivityLog } = require("../services/logService");
 
 // Public: Get all active header slides
 exports.getActiveHeaderSlides = async (req, res) => {
@@ -33,10 +34,9 @@ exports.getAllHeaderSlides = async (req, res) => {
 
 // Admin: Create a new header slide
 exports.createHeaderSlide = async (req, res) => {
+  const { link, display_order, is_active } = req.body;
+  const { image_desktop, image_mobile } = req.files;
   try {
-    const { link, display_order, is_active } = req.body;
-    const { image_desktop, image_mobile } = req.files;
-
     if (!image_desktop || !image_mobile) {
       return res
         .status(400)
@@ -55,20 +55,39 @@ exports.createHeaderSlide = async (req, res) => {
       is_active: is_active === "true" || is_active === true,
     });
 
+    await createActivityLog(
+      req,
+      req.user,
+      "CREATE",
+      { type: "HeaderSlide", id: newSlide.id },
+      { newData: newSlide.toJSON() }
+    );
+
     res
       .status(201)
       .json({ message: "Slide berhasil ditambahkan.", slide: newSlide });
   } catch (error) {
     console.error("Error creating header slide:", error);
+    await createActivityLog(
+      req,
+      req.user,
+      "CREATE",
+      { type: "HeaderSlide", id: "N/A" },
+      {
+        error: error.message,
+        attemptedData: { link, display_order, is_active },
+      },
+      "FAILED"
+    );
     res.status(500).json({ message: "Internal server error." });
   }
 };
 
 // Admin: Update a header slide
 exports.updateHeaderSlide = async (req, res) => {
+  const { id } = req.params;
+  const { link, display_order, is_active } = req.body;
   try {
-    const { id } = req.params;
-    const { link, display_order, is_active } = req.body;
     const files = req.files;
 
     const slide = await HeaderSlide.findByPk(id);
@@ -98,19 +117,51 @@ exports.updateHeaderSlide = async (req, res) => {
       updateData.image_url_mobile = `/uploads/slides/image_mobile/${files.image_mobile[0].filename}`;
     }
 
+    const oldData = slide.toJSON();
+    const changes = {};
+
+    // Bandingkan data lama dan baru untuk mencatat perubahan
+    for (const key in updateData) {
+      if (String(updateData[key]) !== String(oldData[key])) {
+        changes[key] = { before: oldData[key], after: updateData[key] };
+      }
+    }
+
     await slide.update(updateData);
+
+    // Hanya catat log jika ada perubahan
+    if (Object.keys(changes).length > 0) {
+      await createActivityLog(
+        req,
+        req.user,
+        "UPDATE",
+        { type: "HeaderSlide", id: id },
+        changes
+      );
+    }
 
     res.status(200).json({ message: "Slide berhasil diperbarui.", slide });
   } catch (error) {
     console.error("Error updating header slide:", error);
+    await createActivityLog(
+      req,
+      req.user,
+      "UPDATE",
+      { type: "HeaderSlide", id: id },
+      {
+        error: error.message,
+        attemptedChanges: { link, display_order, is_active },
+      },
+      "FAILED"
+    );
     res.status(500).json({ message: "Internal server error." });
   }
 };
 
 // Admin: Delete a header slide
 exports.deleteHeaderSlide = async (req, res) => {
+  const { id } = req.params;
   try {
-    const { id } = req.params;
     const slide = await HeaderSlide.findByPk(id);
     if (!slide)
       return res.status(404).json({ message: "Slide tidak ditemukan." });
@@ -122,13 +173,31 @@ exports.deleteHeaderSlide = async (req, res) => {
       }
     };
 
+    const deletedData = slide.toJSON();
+
     deleteImage(slide.image_url_desktop);
     deleteImage(slide.image_url_mobile);
 
     await slide.destroy();
+
+    await createActivityLog(
+      req,
+      req.user,
+      "DELETE",
+      { type: "HeaderSlide", id: id },
+      { deletedData }
+    );
     res.status(200).json({ message: "Slide berhasil dihapus." });
   } catch (error) {
     console.error("Error deleting header slide:", error);
+    await createActivityLog(
+      req,
+      req.user,
+      "DELETE",
+      { type: "HeaderSlide", id: id },
+      { error: error.message },
+      "FAILED"
+    );
     res.status(500).json({ message: "Internal server error." });
   }
 };

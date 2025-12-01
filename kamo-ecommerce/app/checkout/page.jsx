@@ -221,7 +221,12 @@ const CheckoutPage = () => {
     const roundedPaymentFee = Math.ceil(paymentFee / 1000) * 1000;
 
     return [subtotalPlusShipping + roundedPaymentFee, roundedPaymentFee];
-  }, [selectedCartTotal, shippingCost, selectedPayment, installmentTerm]);
+  }, [
+    selectedCartTotal,
+    shippingCost,
+    selectedPayment,
+    installmentTerm,
+  ]);
 
   // Add this function to handle payment method selection
   const handlePaymentMethodSelect = (method) => {

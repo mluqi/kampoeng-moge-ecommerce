@@ -269,7 +269,7 @@ const Cart = () => {
                   className="w-full mt-6 bg-accent text-white py-3 rounded-md hover:bg-accent/90 transition font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
                   onClick={() => router.push("/checkout")}
                 >
-                  Beli ({selectedItems.length})
+                  Lanjut ke pembayaran ({selectedItems.length})
                 </button>
               </div>
             </div>
@@ -324,7 +324,7 @@ const Cart = () => {
             className="w-full bg-accent text-white py-3 rounded-md hover:bg-accent/90 transition font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
             onClick={() => router.push("/checkout")}
           >
-            Beli
+            Lanjut ke pembayaran
           </button>
         </div>
       )}

@@ -1,7 +1,8 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { admin_akses } = require("../models");
+const { admin_akses, AccessLog } = require("../models");
 const { User, Addresses, sequelize } = require("../models");
+const { getClientIp, getClientBrowser } = require("../utils/requestUtils");
 const { getToken } = require("next-auth/jwt");
 
 const getUserFromToken = async (req) => {
@@ -17,15 +18,44 @@ const getUserFromToken = async (req) => {
 // Admin Signin
 exports.adminSignin = async (req, res) => {
   const { email, password } = req.body;
+  const ip_address = getClientIp(req);
+  const user_agent = req.headers["user-agent"];
+  const browser = getClientBrowser(user_agent);
+
   try {
     const admin = await admin_akses.findOne({ where: { email } });
     if (!admin) {
+      // Catat upaya login gagal (user tidak ditemukan)
+      await AccessLog.create({
+        email,
+        ip_address,
+        user_agent: browser,
+        status: "FAILED",
+      });
       return res.status(404).json({ message: "Admin tidak ditemukan" });
     }
     const passwordMatch = await bcrypt.compare(password, admin.password);
     if (!passwordMatch) {
+      // Catat upaya login gagal (password salah)
+      await AccessLog.create({
+        admin_id: admin.id,
+        email,
+        ip_address,
+        user_agent: browser,
+        status: "FAILED",
+      });
       return res.status(401).json({ message: "Password salah" });
     }
+
+    // Catat login berhasil
+    await AccessLog.create({
+      admin_id: admin.id,
+      email,
+      ip_address,
+      user_agent: browser,
+      status: "SUCCESS",
+    });
+
     const token = jwt.sign(
       { id: admin.id, role: "admin" },
       process.env.JWT_SECRET,
@@ -34,6 +64,7 @@ exports.adminSignin = async (req, res) => {
     await admin_akses.update({ token }, { where: { id: admin.id } });
     res.status(200).json({ token });
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: "Terjadi kesalahan pada server." });
   }
 };
@@ -364,18 +395,21 @@ exports.addAddress = async (req, res) => {
     }
 
     // Simpan address baru
-    const address = await Addresses.create({
-      address_user: user.user_id,
-      address_full_name: fullName,
-      address_phone: phoneNumber,
-      address_pincode: pincode,
-      address_area: area,
-      address_city: city,
-      address_state: state,
-      address_country: country || "",
-      address_label: label || "",
-      address_is_default: makeDefault,
-    }, { transaction: t });
+    const address = await Addresses.create(
+      {
+        address_user: user.user_id,
+        address_full_name: fullName,
+        address_phone: phoneNumber,
+        address_pincode: pincode,
+        address_area: area,
+        address_city: city,
+        address_state: state,
+        address_country: country || "",
+        address_label: label || "",
+        address_is_default: makeDefault,
+      },
+      { transaction: t }
+    );
 
     await t.commit();
     return res
@@ -425,16 +459,19 @@ exports.editAddress = async (req, res) => {
     }
 
     // Update field yang diizinkan
-    await address.update({
-      address_full_name: fullName,
-      address_phone: phoneNumber,
-      address_pincode: pincode,
-      address_area: area,
-      address_city: city,
-      address_state: state,
-      address_country: country,
-      address_label: label,
-    }, { transaction: t });
+    await address.update(
+      {
+        address_full_name: fullName,
+        address_phone: phoneNumber,
+        address_pincode: pincode,
+        address_area: area,
+        address_city: city,
+        address_state: state,
+        address_country: country,
+        address_label: label,
+      },
+      { transaction: t }
+    );
 
     await t.commit();
     return res.status(200).json({
@@ -477,7 +514,8 @@ exports.deleteAddress = async (req, res) => {
     // Validasi: Jangan hapus alamat utama
     if (address.address_is_default) {
       return res.status(400).json({
-        message: "Tidak dapat menghapus alamat utama. Jadikan alamat lain sebagai utama terlebih dahulu.",
+        message:
+          "Tidak dapat menghapus alamat utama. Jadikan alamat lain sebagai utama terlebih dahulu.",
       });
     }
 

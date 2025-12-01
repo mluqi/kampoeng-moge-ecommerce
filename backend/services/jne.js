@@ -1,8 +1,13 @@
 require("dotenv").config();
 const axios = require("axios");
 const qs = require("qs");
+const cron = require("node-cron");
+const { Order, OrderItem, Product, sequelize } = require("../models");
+const { Op } = require("sequelize");
 
-const JNE_API_URL = "https://apiv2.jne.co.id:10205/tracing/api";
+const { createApiLog } = require("./apiLogService");
+const JNE_API_URL =
+  process.env.JNE_API_URL || "https://apiv2.jne.co.id:10205/tracing/api";
 const JNE_USERNAME = process.env.JNE_USERNAME;
 const JNE_API_KEY = process.env.JNE_API_KEY;
 const JNE_OLSHOP_BRANCH = process.env.JNE_OLSHOP_BRANCH;
@@ -39,6 +44,7 @@ const getJnePrice = async ({ from, thru, weight }) => {
     throw new Error("JNE_USERNAME and JNE_API_KEY must be set in .env file");
   }
 
+  const startTime = Date.now();
   try {
     const payload = {
       username: JNE_USERNAME,
@@ -50,15 +56,37 @@ const getJnePrice = async ({ from, thru, weight }) => {
 
     const response = await jneInstance.post("/pricedev", qs.stringify(payload));
 
+    await createApiLog({
+      serviceName: "JNE",
+      endpoint: "/pricedev",
+      requestPayload: payload,
+      responsePayload: response.data,
+      status: "SUCCESS",
+      durationMs: Date.now() - startTime,
+    });
+
     return response.data;
   } catch (error) {
+    const responsePayload = error.response?.data || {
+      message: error.message,
+    };
+    await createApiLog({
+      serviceName: "JNE",
+      endpoint: "/pricedev",
+      requestPayload: { from, thru, weight },
+      responsePayload: responsePayload,
+      status: "FAILED",
+      errorMessage: error.message,
+      durationMs: Date.now() - startTime,
+    });
+
     if (axios.isAxiosError(error)) {
       console.error(
         "JNE API Axios Error:",
         error.response?.data || error.message
       );
       throw (
-        error.response?.data ||
+        responsePayload ||
         new Error("Failed to get JNE shipping price due to a network error.")
       );
     }
@@ -88,6 +116,7 @@ const generateAirwayBill = async (data) => {
     throw new Error("Incomplete JNE shipper details in .env file");
   }
 
+  const startTime = Date.now();
   try {
     const payload = {
       username: JNE_USERNAME,
@@ -135,6 +164,14 @@ const generateAirwayBill = async (data) => {
 
     // Check for success status in the response body
     if (response.data?.detail?.[0]?.status?.toLowerCase() === "sukses") {
+      await createApiLog({
+        serviceName: "JNE",
+        endpoint: "/generatecnote",
+        requestPayload: payload, // Consider masking sensitive data if necessary
+        responsePayload: response.data,
+        status: "SUCCESS",
+        durationMs: Date.now() - startTime,
+      });
       return response.data;
     } else {
       // Throw an error if the API indicates failure
@@ -144,13 +181,26 @@ const generateAirwayBill = async (data) => {
       throw new Error(errorMessage);
     }
   } catch (error) {
+    const responsePayload = error.response?.data || {
+      message: error.message,
+    };
+    await createApiLog({
+      serviceName: "JNE",
+      endpoint: "/generatecnote",
+      requestPayload: data, // Consider masking sensitive data
+      responsePayload: responsePayload,
+      status: "FAILED",
+      errorMessage: error.message,
+      durationMs: Date.now() - startTime,
+    });
+
     if (axios.isAxiosError(error)) {
       console.error(
         "JNE AWB API Axios Error:",
         error.response?.data || error.message
       );
       throw (
-        error.response?.data ||
+        responsePayload ||
         new Error("Failed to generate JNE AWB due to a network error.")
       );
     }
@@ -171,6 +221,7 @@ const trackingOrder = async (trackingNumber) => {
     throw new Error("JNE_USERNAME and JNE_API_KEY must be set in .env file");
   }
 
+  const startTime = Date.now();
   try {
     const payload = {
       username: JNE_USERNAME,
@@ -185,6 +236,14 @@ const trackingOrder = async (trackingNumber) => {
 
     // Assuming a successful response has a 'cnote' or 'detail' object.
     if (response.data && (response.data.cnote || response.data.detail)) {
+      await createApiLog({
+        serviceName: "JNE",
+        endpoint: `/list/v1/cnote/${trackingNumber}`,
+        requestPayload: payload,
+        responsePayload: response.data,
+        status: "SUCCESS",
+        durationMs: Date.now() - startTime,
+      });
       return response.data;
     } else {
       // JNE might return an error message in a different structure
@@ -193,13 +252,26 @@ const trackingOrder = async (trackingNumber) => {
       throw new Error(errorMessage);
     }
   } catch (error) {
+    const responsePayload = error.response?.data || {
+      message: error.message,
+    };
+    await createApiLog({
+      serviceName: "JNE",
+      endpoint: `/list/v1/cnote/${trackingNumber}`,
+      requestPayload: { trackingNumber },
+      responsePayload: responsePayload,
+      status: "FAILED",
+      errorMessage: error.message,
+      durationMs: Date.now() - startTime,
+    });
+
     if (axios.isAxiosError(error)) {
       console.error(
         "JNE Tracking API Axios Error:",
         error.response?.data || error.message
       );
       throw (
-        error.response?.data ||
+        responsePayload ||
         new Error("Failed to track JNE shipment due to a network error.")
       );
     }
@@ -210,4 +282,111 @@ const trackingOrder = async (trackingNumber) => {
   }
 };
 
-module.exports = { getJnePrice, generateAirwayBill, trackingOrder };
+/**
+ * Cron job function to track shipped orders and mark them as completed if delivered.
+ */
+const trackAndCompleteOrders = async () => {
+  console.log("Running cron job: Checking status of shipped orders...");
+
+  try {
+    const shippedOrders = await Order.findAll({
+      where: {
+        status: "shipped",
+        shipping_number: {
+          [Op.ne]: null,
+        },
+      },
+      include: [{ model: OrderItem, as: "items" }],
+    });
+    console.log(shippedOrders);
+
+    if (shippedOrders.length === 0) {
+      console.log("No shipped orders to track.");
+      return;
+    }
+
+    console.log(`Found ${shippedOrders.length} shipped orders to track.`);
+
+    for (const order of shippedOrders) {
+      try {
+        const trackingResult = await trackingOrder(order.shipping_number);
+
+        if (trackingResult?.cnote?.pod_status === "DELIVERED") {
+          console.log(
+            `Order ${order.order_id} is DELIVERED. Updating status to completed.`
+          );
+
+          const t = await sequelize.transaction();
+          try {
+            const orderToUpdate = await Order.findByPk(order.order_id, {
+              transaction: t,
+              include: [{ model: OrderItem, as: "items" }],
+            });
+            if (orderToUpdate && orderToUpdate.status === "shipped") {
+              orderToUpdate.status = "completed";
+              await orderToUpdate.save({ transaction: t });
+
+              // Increment product_sold count
+              for (const item of orderToUpdate.items) {
+                await Product.increment("product_sold", {
+                  by: item.quantity,
+                  where: { product_id: item.product_id },
+                  transaction: t,
+                });
+              }
+              await t.commit();
+              console.log(`Successfully completed order ${order.order_id}.`);
+            } else {
+              await t.rollback();
+              console.log(
+                `Skipping order ${order.order_id}, status might have changed.`
+              );
+            }
+          } catch (dbError) {
+            await t.rollback();
+            console.error(
+              `Failed to update order ${order.order_id} in database:`,
+              dbError
+            );
+          }
+        } else {
+          console.log(
+            `Order ${
+              order.order_id
+            } status is not yet DELIVERED. Current status: ${
+              trackingResult?.cnote?.pod_status || "N/A"
+            }`
+          );
+        }
+      } catch (trackingError) {
+        console.error(
+          `Failed to track order ${order.order_id} with AWB ${order.shipping_number}:`,
+          trackingError.message
+        );
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching shipped orders for cron job:", error);
+  }
+  console.log("Cron job finished.");
+};
+
+/**
+ * Starts the cron job to track orders.
+ * Runs every hour.
+ */
+const startTrackingCronJob = () => {
+  // Jalankan sekali saat server dimulai
+  trackAndCompleteOrders();
+
+  // Jadwal: '0 * * * *' berarti "jalankan pada menit ke-0 setiap jam"
+  cron.schedule("0 * * * *", trackAndCompleteOrders);
+  console.log("JNE order tracking cron job scheduled to run every hour.");
+};
+
+module.exports = {
+  getJnePrice,
+  generateAirwayBill,
+  trackingOrder,
+  startTrackingCronJob,
+};

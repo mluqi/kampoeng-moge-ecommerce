@@ -14,11 +14,11 @@ const poppinsFont = Poppins({
 
 export const metadata: Metadata = {
   title: {
-    default: "KAMO Ecommerce - Jual Sparepart Moge Terpercaya",
+    default: "KAMO Official E-Commerce Store Trusted Since 2008",
     template: "%s | KAMO Ecommerce",
   },
   description:
-    "Temukan berbagai sparepart motor gede (moge) berkualitas, suku cadang, dan aksesoris di KAMO Ecommerce. Belanja aman, pengiriman cepat.",
+    "Dapatkan berbagai sparepart dan aksesoris moge berkualitas di kampoengmoge.com. ",
   keywords: [
     "moge",
     "motor gede",
@@ -27,14 +27,14 @@ export const metadata: Metadata = {
     "suku cadang motor",
   ],
   openGraph: {
-    title: "KAMO Ecommerce - Jual Sparepart Moge Terpercaya",
+    title: "KAMO Official E-Commerce Store Trusted Since 2008",
     description:
-      "Temukan berbagai sparepart motor gede (moge) berkualitas dan aksesorisnya di kampoengmoge.com",
+      "Dapatkan berbagai sparepart dan aksesoris moge berkualitas di kampoengmoge.com.",
     url: "https://kampoengmoge.com",
     siteName: "kampoengmoge.com",
     images: [
       {
-        url: "https://kampoengmoge.com/uploads/settings/1754966221417-logo_accent.svg", // Pastikan URL gambar absolut dan benar
+        url: "https://kampoengmoge.com/uploads/settings/kamo.png", // Pastikan URL gambar absolut dan benar
         width: 1200,
         height: 630,
         alt: "KAMO Ecommerce Logo",
@@ -45,11 +45,10 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "KAMO Ecommerce - Jual Sparepart Moge Terpercaya",
+    title: "KAMO Official E-Commerce Store Trusted Since 2008",
     description:
-      "Temukan berbagai sparepart motor gede (moge) berkualitas dan aksesorisnya di kampoengmoge.com",
-    images:
-      "https://kampoengmoge.com/uploads/settings/1754966221417-logo_accent.svg",
+      "Dapatkan berbagai sparepart dan aksesoris moge berkualitas di kampoengmoge.com. ",
+    images: "https://kampoengmoge.com/uploads/settings/kamo.png",
     site: "@kampoengmoge", // Tambahkan handle Twitter jika ada
   },
   robots: {

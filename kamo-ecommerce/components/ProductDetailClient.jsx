@@ -352,7 +352,7 @@ const ProductDetailClient = ({ initialProductData }) => {
           <div className="mb-3 p-4 bg-gray-50 rounded-lg relative">
             {productData.product_is_discount && (
               <div className="absolute top-0 left-0 text-white">
-                <div className="relative w-14 h-14 -translate-x-1 md:-translate-y-0 md:-translate-x-1.5 -translate-y-0.5">
+                <div className="relative w-14 h-14 -translate-x-[8%] md:-translate-y-0 md:-translate-x-[10%] -translate-y-0.5">
                   <LabelDiskon className="text-[#F84B62]" />
                   <div className="absolute text-white inset-0 flex items-center justify-center text-[10px] md:text-xs font-bold transform md:-translate-y-[20%] md:-translate-x-2 -translate-y-3.5 -translate-x-3">
                     {productData.product_discount_percentage}%

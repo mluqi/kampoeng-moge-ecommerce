@@ -166,7 +166,7 @@ const ChatWidget = () => {
             </div>
 
             {/* Messages area */}
-            <div className="flex-1 p-4 overflow-y-auto bg-gray-50 space-y-4">
+            <div className="flex-1 p-4 overflow-y-auto bg-gray-50 space-y-4 overflow-x-hidden">
               {/* Welcome message */}
               <div className="flex justify-start">
                 <div className="max-w-xs bg-white text-gray-800 px-4 py-3 rounded-xl rounded-bl-none shadow-sm border border-gray-200">

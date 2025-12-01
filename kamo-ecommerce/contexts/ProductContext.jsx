@@ -72,37 +72,30 @@ export const ProductProvider = ({ children }) => {
 
   // Tambah produk
   const addProduct = async (formData) => {
-    setLoading(true);
-    setError("");
     try {
       await api.post("/products", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       await fetchProducts(lastFetchParams);
-      return true;
     } catch (err) {
-      setError(err?.response?.data?.message || "Gagal tambah produk");
-      return false;
-    } finally {
-      setLoading(false);
+      // Melempar kembali error dengan pesan yang lebih spesifik dari backend
+      const errorMessage =
+        err?.response?.data?.message || "Gagal menambahkan produk.";
+      throw new Error(errorMessage);
     }
   };
 
   // Update produk
   const updateProduct = async (id, formData) => {
-    setLoading(true);
-    setError("");
     try {
       await api.put(`/products/${id}`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       await fetchProducts(lastFetchParams);
-      return true;
     } catch (err) {
-      setError(err?.response?.data?.message || "Gagal update produk");
-      return false;
-    } finally {
-      setLoading(false);
+      const errorMessage =
+        err?.response?.data?.message || "Gagal memperbarui produk.";
+      throw new Error(errorMessage);
     }
   };
 

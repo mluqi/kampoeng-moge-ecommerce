@@ -21,6 +21,7 @@ const {
   searchOrders: searchTiktokOrders,
   getOrderDetails: getTiktokOrderDetails,
 } = require("../services/tiktokShop");
+const { createActivityLog } = require("../services/logService");
 
 // Helper function to safely parse JSON fields from a product object
 const parseProductJSONFields = (productData) => {
@@ -215,7 +216,13 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    const { items, shippingAddress, shippingMethod, paymentMethod } = req.body;
+    const {
+      items,
+      shippingAddress,
+      shippingMethod,
+      paymentMethod,
+      useInsurance,
+    } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       await t.rollback();
@@ -315,6 +322,8 @@ exports.createOrder = async (req, res) => {
       });
     }
 
+    const shippingCost = shippingMethod.cost || 0;
+
     // 2. Hitung biaya berdasarkan metode pembayaran
     let orderFee = 0;
     let transactionFee = 0;
@@ -322,15 +331,13 @@ exports.createOrder = async (req, res) => {
 
     if (paymentMethodDetails.wlpay_code === "CREDIT_CARD") {
       // Biaya kartu kredit tanpa cicilan: 2.9% + 2000
-      orderFee = calculatedSubtotal * 0.029 + 2000;
-      // Jika ada implementasi cicilan di masa depan, tambahkan logika di sini
-      // Contoh:
+      orderFee = (calculatedSubtotal + shippingCost) * 0.029 + 2000;
       if (installmentTerm === 3) {
-        orderFee = calculatedSubtotal * 0.05 + 2000;
+        orderFee = (calculatedSubtotal + shippingCost) * 0.05 + 2000;
       } else if (installmentTerm === 6) {
-        orderFee = calculatedSubtotal * 0.07 + 2000;
+        orderFee = (calculatedSubtotal + shippingCost) * 0.07 + 2000;
       } else if (installmentTerm === 12) {
-        orderFee = calculatedSubtotal * 0.1 + 2000;
+        orderFee = (calculatedSubtotal + shippingCost) * 0.1 + 2000;
       }
       transactionFee = orderFee * 0.11; // 11% dari biaya cicilan
     } else {
@@ -339,8 +346,6 @@ exports.createOrder = async (req, res) => {
     }
 
     const ppn = transactionFee * 0.11;
-
-    const shippingCost = shippingMethod.cost || 0;
 
     const fee_apps = calculatedSubtotal * 0.01; // 1% dari subtotal barang
 
@@ -610,6 +615,72 @@ exports.cancelOrder = async (req, res) => {
   }
 };
 
+exports.completeOrder = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const user = await getUserFromToken(req);
+    if (!user) {
+      await t.rollback();
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { id: orderId } = req.params;
+
+    const order = await Order.findOne({
+      where: {
+        order_id: orderId,
+        user_id: user.user_id,
+      },
+      include: [{ model: OrderItem, as: "items" }],
+      transaction: t,
+    });
+
+    if (!order) {
+      await t.rollback();
+      return res.status(404).json({ message: "Pesanan tidak ditemukan." });
+    }
+
+    if (order.status !== "shipped") {
+      await t.rollback();
+      return res.status(400).json({
+        message: `Hanya pesanan dengan status 'dikirim' yang dapat diselesaikan.`,
+      });
+    }
+    
+    const oldStatus = order.status;
+    order.status = "completed";
+    await order.save({ transaction: t });
+
+    if (order.status === "completed" && oldStatus !== "completed") {
+      for (const item of order.items) {
+        await Product.increment("product_sold", {
+          by: item.quantity,
+          where: { product_id: item.product_id },
+          transaction: t,
+        });
+      }
+    }
+
+    await createActivityLog(
+      req,
+      user, // Logged-in user is the one completing the order
+      "UPDATE_STATUS",
+      { type: "Order", id: orderId },
+      { before: "shipped", after: "completed" }
+    );
+
+    await t.commit();
+
+    res.status(200).json({
+      message: "Pesanan telah diselesaikan.",
+      order: parseOrder(order),
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error("Error completing order:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
 // --- ADMIN FUNCTIONS ---
 
 exports.getAllOrdersAdmin = async (req, res) => {
@@ -721,10 +792,29 @@ exports.updateOrderStatus = async (req, res) => {
     order.status = status;
     await order.save({ transaction: t });
 
+    if (oldStatus !== status) {
+      await createActivityLog(
+        req,
+        req.user,
+        "UPDATE_STATUS",
+        { type: "Order", id: req.params.id },
+        { before: oldStatus, after: status }
+      );
+    }
+
     // Jika status berubah menjadi 'completed' dari status lain, update jumlah terjual
     if (status === "completed" && oldStatus !== "completed") {
       for (const item of order.items) {
         await Product.increment("product_sold", {
+          by: item.quantity,
+          where: { product_id: item.product_id },
+          transaction: t,
+        });
+      }
+    } else if (oldStatus === "completed" && status !== "completed") {
+      // Jika status berubah dari 'completed' ke status lain, kurangi jumlah terjual
+      for (const item of order.items) {
+        await Product.decrement("product_sold", {
           by: item.quantity,
           where: { product_id: item.product_id },
           transaction: t,
@@ -755,6 +845,14 @@ exports.updateOrderStatus = async (req, res) => {
   } catch (error) {
     console.error("Error updating order status:", error);
     await t.rollback();
+    await createActivityLog(
+      req,
+      req.user,
+      "UPDATE_STATUS",
+      { type: "Order", id: req.params.id },
+      { error: error.message, attemptedChange: { status } },
+      "FAILED"
+    );
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -785,8 +883,19 @@ exports.approveCancelOrder = async (req, res) => {
       });
     }
 
+    const oldStatus = order.status;
     order.status = "cancelled";
     await order.save({ transaction: t });
+
+    if (oldStatus !== "cancelled") {
+      await createActivityLog(
+        req,
+        req.user,
+        "APPROVE_CANCELLATION",
+        { type: "Order", id: req.params.id },
+        { before: oldStatus, after: "cancelled" }
+      );
+    }
 
     const productsToSync = [];
 
@@ -821,6 +930,14 @@ exports.approveCancelOrder = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error("Error approving cancellation:", error);
+    await createActivityLog(
+      req,
+      req.user,
+      "APPROVE_CANCELLATION",
+      { type: "Order", id: req.params.id },
+      { error: error.message },
+      "FAILED"
+    );
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -840,9 +957,20 @@ exports.rejectCancelOrder = async (req, res) => {
       });
     }
 
+    const oldStatus = order.status;
     order.status = "pending";
     order.cancel_reason = null;
     await order.save();
+
+    if (oldStatus !== "pending") {
+      await createActivityLog(
+        req,
+        req.user,
+        "REJECT_CANCELLATION",
+        { type: "Order", id: req.params.id },
+        { before: oldStatus, after: "pending" }
+      );
+    }
 
     res.status(200).json({
       message: "Permintaan pembatalan pesanan telah ditolak.",
@@ -850,6 +978,14 @@ exports.rejectCancelOrder = async (req, res) => {
     });
   } catch (error) {
     console.error("Error rejecting cancellation request:", error);
+    await createActivityLog(
+      req,
+      req.user,
+      "REJECT_CANCELLATION",
+      { type: "Order", id: req.params.id },
+      { error: error.message },
+      "FAILED"
+    );
     res.status(500).json({ message: "Internal server error" });
   }
 };

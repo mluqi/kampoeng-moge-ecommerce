@@ -34,7 +34,7 @@ const ShareModal = ({ isOpen, onClose, shareData }) => {
     {
       name: "Instagram",
       icon: <FaInstagram size={24} className="text-pink-500" />,
-      url: `https://www.instagram.com/`,
+      url: `https://www.instagram.com/kampoengmoge`,
     },
   ];
 

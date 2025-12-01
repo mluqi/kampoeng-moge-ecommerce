@@ -76,6 +76,7 @@ const AddProduct = () => {
   const [tiktokCategoryId, setTiktokCategoryId] = useState("");
   const [tiktokProductAttributes, setTiktokProductAttributes] = useState([]);
   const [descriptionLength, setDescriptionLength] = useState(0);
+  const [listingPlatforms, setListingPlatforms] = useState(["TOKOPEDIA"]);
 
   // State for confirmation modal
   const [confirmationModal, setConfirmationModal] = useState({
@@ -108,6 +109,14 @@ const AddProduct = () => {
     },
     []
   );
+
+  const handlePlatformChange = (platform) => {
+    setListingPlatforms((prev) =>
+      prev.includes(platform)
+        ? prev.filter((p) => p !== platform)
+        : [...prev, platform]
+    );
+  };
 
   const formatNumber = (value) => {
     const numericValue = String(value).replace(/\D/g, "");
@@ -228,17 +237,14 @@ const AddProduct = () => {
   // Preserved the handleSubmit function with added loading state
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
 
     const numericPrice = price.replace(/\./g, "");
     const numericTiktokPrice = tiktokPrice.replace(/\./g, "");
-
     const cleanedDescription = description.replace(/<p><br><\/p>/g, "<br>");
 
     // --- START: Frontend Validation ---
     if (name.length < 25 || name.length > 255) {
       toast.error("Judul produk harus antara 25 dan 255 karakter.");
-      setIsSubmitting(false);
       return;
     }
 
@@ -250,32 +256,12 @@ const AddProduct = () => {
       plainTextDescription.length > 10000
     ) {
       toast.error("Deskripsi produk harus antara 60 dan 10.000 karakter.");
-      setIsSubmitting(false);
       return;
     }
 
     const { length, width, height } = dimensions;
     const weightKg = parseFloat(weight);
-
-    if (
-      !length ||
-      !width ||
-      !height ||
-      parseFloat(length) <= 0 ||
-      parseFloat(length) > 60 ||
-      parseFloat(width) <= 0 ||
-      parseFloat(width) > 60 ||
-      parseFloat(height) <= 0 ||
-      parseFloat(height) > 60
-    ) {
-      toast.error(
-        "Setiap dimensi (panjang, lebar, tinggi) harus antara 0.01 dan 60 cm."
-      );
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (weightKg > 0) {
+    if (weightKg >= 1) {
       const chargeableWeightRatio =
         (parseFloat(length) * parseFloat(width) * parseFloat(height)) /
         6000 /
@@ -286,44 +272,52 @@ const AddProduct = () => {
             2
           )}). Seharusnya kurang dari 1.1.`
         );
-        setIsSubmitting(false);
         return;
       }
     }
     // --- END: Frontend Validation ---
 
-    try {
-      const formData = new FormData();
-      formData.append("name", name);
-      formData.append("description", cleanedDescription);
-      formData.append("sku", sku);
-      formData.append("price", numericPrice);
-      formData.append("product_price_tiktok", numericTiktokPrice);
-      formData.append("stock", stock);
-      formData.append("minOrder", minOrder);
-      formData.append("condition", condition);
-      formData.append("status", status);
-      formData.append("category", category);
-      formData.append("weight", weight);
-      formData.append("dimension", JSON.stringify(dimensions));
-      formData.append("annotations", annotations);
-      formData.append("brand", brand);
+    if (listingPlatforms.length === 0) {
+      toast.error("Pilih setidaknya satu platform penjualan.");
+      return;
+    }
 
-      // 4. Tambahkan data TikTok ke FormData untuk dikirim ke backend
-      // Catatan: Backend controller perlu diupdate untuk menangani field ini
-      if (tiktokCategoryId) {
-        formData.append("tiktokCategoryId", tiktokCategoryId);
-        formData.append(
-          "tiktokProductAttributes",
-          JSON.stringify(tiktokProductAttributes)
-        );
-        formData.append("categoryKeyword", categoryKeyword);
-      }
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("description", cleanedDescription);
+    formData.append("sku", sku);
+    formData.append("price", numericPrice);
+    formData.append("product_price_tiktok", numericTiktokPrice);
+    formData.append("stock", stock);
+    formData.append("minOrder", minOrder);
+    formData.append("condition", condition);
+    formData.append("status", status);
+    formData.append("category", category);
+    formData.append("weight", weight);
+    formData.append("dimension", JSON.stringify(dimensions));
+    formData.append("annotations", annotations);
+    formData.append("brand", brand);
 
-      // Kirim file yang sudah diurutkan
-      files.forEach((item) => formData.append("pictures", item.file));
-      const success = await addProduct(formData);
-      if (success) {
+    // 4. Tambahkan data TikTok ke FormData untuk dikirim ke backend
+    if (tiktokCategoryId) {
+      formData.append("tiktokCategoryId", tiktokCategoryId);
+      formData.append(
+        "tiktokProductAttributes",
+        JSON.stringify(tiktokProductAttributes)
+      );
+      formData.append("categoryKeyword", categoryKeyword);
+    }
+    formData.append("listingPlatforms", JSON.stringify(listingPlatforms));
+
+    // Kirim file yang sudah diurutkan
+    files.forEach((item) => formData.append("pictures", item.file));
+
+    // Gunakan toast.promise untuk menangani state loading, success, dan error
+    const promise = addProduct(formData);
+
+    toast.promise(promise, {
+      loading: "Menyimpan produk...",
+      success: () => {
         toast.success("Produk berhasil ditambahkan!");
         // Reset form
         setFiles([]);
@@ -345,14 +339,10 @@ const AddProduct = () => {
         setTiktokCategoryId("");
         setCategoryKeyword("");
         setTiktokProductAttributes([]);
-      } else {
-        toast.error("Gagal menambah produk");
-      }
-    } catch (err) {
-      toast.error("Gagal menambah produk");
-    } finally {
-      setIsSubmitting(false);
-    }
+        return "Produk berhasil ditambahkan!"; // Pesan ini tidak akan ditampilkan, tapi diperlukan oleh toast
+      },
+      error: (err) => err.message, // Menampilkan pesan error dari backend
+    });
   };
 
   const confirmAndSubmit = (e) => {
@@ -706,8 +696,9 @@ const AddProduct = () => {
                   required
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Catatan: Rasio berat Seharusnya kurang dari 1.1. Rumus:
-                  (Panjang x Lebar x Tinggi / 6000) / Berat.
+                  Catatan: Jika berat kurang dari 1kg, masukkan 0.5. Rasio berat
+                  Seharusnya kurang dari 1.1. Rumus: (Panjang x Lebar x Tinggi /
+                  6000) / Berat.
                 </p>
               </div>
 
@@ -779,6 +770,33 @@ const AddProduct = () => {
               onAttributesChange={handleTiktokDataChange}
               // Tidak perlu initial value karena ini form tambah produk baru
             />
+          </div>
+
+          {/* Platform Selection */}
+          <div className="pt-6 border-t border-gray-200">
+            <h2 className="text-lg font-medium text-gray-700 mb-3">
+              Platform Penjualan
+            </h2>
+            <div className="flex items-center gap-6">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 text-accent border-gray-300 rounded focus:ring-accent"
+                  checked={listingPlatforms.includes("TOKOPEDIA")}
+                  onChange={() => handlePlatformChange("TOKOPEDIA")}
+                />
+                <span className="text-sm font-medium">Tokopedia</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 text-accent border-gray-300 rounded focus:ring-accent"
+                  checked={listingPlatforms.includes("TIKTOK_SHOP")}
+                  onChange={() => handlePlatformChange("TIKTOK_SHOP")}
+                />
+                <span className="text-sm font-medium">TikTok Shop</span>
+              </label>
+            </div>
           </div>
 
           {/* Status */}

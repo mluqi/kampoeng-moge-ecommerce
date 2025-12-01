@@ -23,8 +23,13 @@ import {
   FaChevronLeft,
   FaTimes,
   FaSignOutAlt,
+  FaKey,
+  FaHistory,
   FaTag,
+  FaUserAstronaut,
+  FaTiktok
 } from "react-icons/fa";
+import { TbApi } from "react-icons/tb";
 import { BiSolidBookContent } from "react-icons/bi";
 const SideBar = ({
   isMobileOpen,
@@ -35,7 +40,7 @@ const SideBar = ({
   const pathname = usePathname();
   const { totalUnreadCount } = useAdminChat();
   const { processingOrdersCount } = useOrderNotification();
-  const { logoutAdmin } = useAuth();
+  const { logoutAdmin, admin } = useAuth();
   const { router } = useAppContext();
 
   const handleLogout = async () => {
@@ -71,6 +76,11 @@ const SideBar = ({
           name: "Tambah Produk",
           path: "/admin/add-product",
           icon: <FaRegPlusSquare />,
+        },
+        {
+          name: "Unggah ke TikTok",
+          path: "/admin/up-to-tiktok",
+          icon: <FaTiktok />,
         },
         {
           name: "Daftar Produk",
@@ -118,7 +128,21 @@ const SideBar = ({
 
     {
       title: "Pengaturan",
-      items: [{ name: "Pengaturan", path: "/admin/settings", icon: <FaCog /> }],
+      items: [
+        { name: "Pengaturan", path: "/admin/settings", icon: <FaCog /> },
+        {
+          name: "User Akses",
+          path: "/admin/userakses",
+          icon: <FaUserAstronaut />,
+        },
+        {
+          name: "Log Aktivitas",
+          path: "/admin/log-activity",
+          icon: <FaHistory />,
+        },
+        { name: "Log Akses", path: "/admin/log-access", icon: <FaKey /> },
+        { name: "Log Api", path: "/admin/log-api", icon: <TbApi /> },
+      ],
     },
   ];
 
@@ -184,11 +208,22 @@ const SideBar = ({
               </div>
               {/* Menu Items */}
               {group.items.map((item) => {
+                if (
+                  (item.path === "/admin/log-activity" ||
+                    item.path === "/admin/log-access" ||
+                    item.path === "/admin/userakses" ||
+                    item.path === "/admin/up-to-tiktok" ||
+                    item.path === "/admin/log-api") &&
+                  admin?.email !== "superadmin@kampoengmoge.com"
+                ) {
+                  return null;
+                }
+
                 const isActive = pathname === item.path;
                 return (
                   <Link href={item.path} key={item.name} passHref>
                     <div
-                      className={`flex items-center py-3 px-4 gap-3 ${
+                      className={`relative flex items-center py-3 px-4 gap-3 ${
                         isActive
                           ? "border-r-4 md:border-r-[6px] bg-accent/10 border-accent/90"
                           : "hover:bg-gray-100/90 border-r-4 border-transparent"
@@ -205,20 +240,26 @@ const SideBar = ({
                       </p>
                       {item.name === "Pesanan" && processingOrdersCount > 0 && (
                         <span
-                          className={`ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center ${
-                            !isExpanded && "md:hidden"
+                          className={`bg-red-500 text-white font-bold rounded-full flex items-center justify-center transition-all duration-300
+                          ${
+                            isExpanded
+                              ? "text-[10px] h-5 w-5 ml-auto"
+                              : "md:text-[0px] md:h-2.5 md:w-2.5 md:absolute md:top-2 md:right-2"
                           }`}
                         >
-                          {processingOrdersCount}
+                          {isExpanded ? processingOrdersCount : ""}
                         </span>
                       )}
                       {item.name === "Pesan" && totalUnreadCount > 0 && (
                         <span
-                          className={`ml-auto bg-red-500 text-white text-[10%] font-bold rounded-full h-5 w-5 flex items-center justify-center ${
-                            !isExpanded && "md:hidden"
+                          className={`bg-red-500 text-white font-bold rounded-full flex items-center justify-center transition-all duration-300
+                          ${
+                            isExpanded
+                              ? "text-[10px] h-5 w-5 ml-auto"
+                              : "md:text-[0px] md:h-2.5 md:w-2.5 md:absolute md:top-2 md:right-2"
                           }`}
                         >
-                          {totalUnreadCount}
+                          {isExpanded ? totalUnreadCount : ""}
                         </span>
                       )}
                     </div>
